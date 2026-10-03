@@ -11,15 +11,20 @@ let AC = null;
 const beds = {};      // 各天气环境声的总闸（增益 0 ↔ 1）
 let ambBus = null;    // 环境声总开关（设置里的「环境声」）；番茄钟铃声不经过它
 let ambOn = true;
+let master = null;    // 总输出：静音按钮关的是它 —— 所有声音（含番茄钟铃声）都经过这里
+let muted = false;
 let chimeIn = 2.5;    // 距下一声风铃（秒）
 
 function initAudio(){
   if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
   try {
     AC = new (window.AudioContext || window.webkitAudioContext)();
+    master = AC.createGain();
+    master.gain.value = muted ? 0 : 1;
+    master.connect(AC.destination);
     ambBus = AC.createGain();
     ambBus.gain.value = ambOn ? 1 : 0;
-    ambBus.connect(AC.destination);
+    ambBus.connect(master);
     for (const w of WEATHERS){
       const g = AC.createGain();
       g.gain.value = 0;
@@ -141,6 +146,22 @@ function tickAudio(dt){
   chimeIn = rnd(3.5, 9);
 }
 
+/* 静音：所有声音（环境声、风铃、点水声、番茄钟铃声）一起淡出 / 淡入 */
+function setMuted(m){
+  muted = m;
+  if (!master) return;
+  const now = AC.currentTime;
+  master.gain.cancelScheduledValues(now);
+  master.gain.setValueAtTime(master.gain.value, now);
+  master.gain.setTargetAtTime(m ? 0 : 1, now, 0.12);
+}
+/* 画布上的静音按钮 / 按 M：切换并通知应用层记下来 */
+function toggleMute(){
+  initAudio();
+  setMuted(!muted);
+  sceneChanged();
+}
+
 /* 环境声开关（淡入淡出，不咔哒） */
 function setAmbientOn(on){
   ambOn = on;
@@ -151,7 +172,7 @@ function setAmbientOn(on){
   ambBus.gain.setTargetAtTime(on ? 1 : 0, now, 0.4);
 }
 
-/* ---------- 番茄钟铃声：三声由低到高的风铃，直接走总输出（关了环境声也听得到） ---------- */
+/* ---------- 番茄钟铃声：三声由低到高的风铃，不经过环境声开关（关了环境声也听得到，静音时不响） ---------- */
 function bell(){
   if (!AC) return;
   if (AC.state === 'suspended') AC.resume();
@@ -164,7 +185,7 @@ function bell(){
       g.gain.setValueAtTime(0.0001, t0);
       g.gain.exponentialRampToValueAtTime(0.12*a, t0 + 0.008);
       g.gain.exponentialRampToValueAtTime(0.0001, t0 + d);
-      o.connect(g); g.connect(AC.destination);
+      o.connect(g); g.connect(master);
       o.start(t0); o.stop(t0 + d + 0.05);
     }
   });
@@ -180,7 +201,7 @@ function plip(){
     o.frequency.exponentialRampToValueAtTime(150, t0 + 0.18);
     g.gain.setValueAtTime(0.075, t0);
     g.gain.exponentialRampToValueAtTime(0.001, t0 + 0.24);
-    o.connect(g); g.connect(AC.destination);
+    o.connect(g); g.connect(master);
     o.start(t0); o.stop(t0 + 0.26);
   } catch(err){}
 }

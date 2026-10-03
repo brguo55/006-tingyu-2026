@@ -60,7 +60,7 @@ function freshData(){
     habits: [],
     checks: {},          // { 习惯id: { 'YYYY-MM-DD': 1 } }
     pomos: [],           // { id, start, end, minutes, taskId }
-    settings: { weather: 0, theme: 2, ambient: true, focusMin: 25, shortMin: 5, longMin: 15, longEvery: 4 },
+    settings: { weather: 0, theme: 2, ambient: true, muted: false, focusMin: 25, shortMin: 5, longMin: 15, longEvery: 4 },
     meta: { createdAt: now, updatedAt: now },
   };
 }

@@ -154,3 +154,30 @@ function drawWeatherBtns(){
     if (act) pen([[cx-10*SC, cy + s*0.62 + 6*SC],[cx+10*SC, cy + s*0.62 + 6*SC]], INK, 1.6, 0.72, i*17.3 + 101, 0);
   }
 }
+
+/* ---------- 静音（画面左上角 · 钢笔手绘小喇叭：有声时两道声波，静音时一个叉） ---------- */
+const icSpeaker = [[-0.36,-0.12],[-0.16,-0.12],[0.06,-0.32],[0.06,0.32],[-0.16,0.12],[-0.36,0.12]]
+  .map(q => [q[0] + wj(0.015), q[1] + wj(0.015)]);
+icSpeaker.push(icSpeaker[0]);
+const icWaves = [0.17, 0.31].map(r => {
+  const pts = [];
+  for (let k = 0; k <= 6; k++){ const a = -0.85 + k/6*1.7; pts.push([0.08 + Math.cos(a)*r + wj(0.008), Math.sin(a)*r + wj(0.008)]); }
+  return pts;
+});
+const icCross = [[[0.2,-0.12],[0.42,0.12]], [[0.2,0.12],[0.42,-0.12]]];
+let muteHover = false;
+function muteBtnPos(){ return { cx: 42*SC, cy: (54 - (muteHover ? 2 : 0))*SC, s: (muteHover ? 35 : 32)*SC }; }
+function hitMuteBtn(px, py){
+  const { cx, cy, s } = muteBtnPos();
+  return Math.abs(px - cx) < s*0.62 && Math.abs(py - cy) < s*0.62;
+}
+function drawMuteBtn(){
+  const { cx, cy, s } = muteBtnPos();
+  const at = q => [cx + q[0]*s, cy + q[1]*s];
+  const ia = muteHover ? 0.85 : 0.65;
+  const pts = icSpeaker.map(at);
+  fillPoly(pts, IC_SNOW, muted ? 0.45 : 0.75, false);
+  pen(pts, INK, 1.3, ia, 61.7, 0.04);
+  if (muted) icCross.forEach((l, k) => pen(l.map(at), INK, 1.5, ia, 71.3 + k*3.1, 0, false));
+  else icWaves.forEach((l, k) => pen(l.map(at), INK, 1.2, ia * (k ? 0.75 : 1), 81.9 + k*4.7, 0, false));
+}

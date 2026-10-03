@@ -9,7 +9,7 @@ A rainy-day planner that runs in the browser: tasks, a pomodoro timer and habit 
 - **Tasks** — lists, a Today view, search, notes and due dates. Type 明天 / 周五 / 下周一 at the start or end of a task to set its due date.
 - **Pomodoro** — focus, short and long breaks, linked to a task, daily and weekly stats, and an immersive full-screen mode. It stays accurate in a background tab and resumes after a reload.
 - **Habits** — daily check-ins, current and best streaks, and a 22-week watercolor grid.
-- **Scene** — rain, snow or sakura (keys 1 / 2 / 3) with matching ambient sound, and seven water colors that also tint the panel. Drag to rotate, scroll to zoom, and click the water to make ripples.
+- **Scene** — rain, snow or sakura (keys 1 / 2 / 3) with matching ambient sound, a mute button (key M), and seven water colors that also tint the panel. Drag to rotate, scroll to zoom, and click the water to make ripples.
 - **Offline & installable** — install it as an app from Chrome or Edge.
 
 ## Your data

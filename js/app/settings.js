@@ -59,13 +59,16 @@ const Settings = {
     kids.push(h('section.set', null,
       h('h3', null, '声音'),
       h('label.switch', null,
+        checkBox(d.settings.muted, () => toggleMute(), '静音'),
+        ' 静音（所有声音，包括番茄钟铃声；画面左上角的小喇叭或按 M 也能切换）'),
+      h('label.switch', null,
         checkBox(d.settings.ambient, () => {
           const on = !Store.data.settings.ambient;
           Store.update(dd => { dd.settings.ambient = on; });
           setAmbientOn(on);
         }, '环境声'),
         ' 环境声（雨声 / 风声 / 风铃）'),
-      h('p.muted', null, '番茄钟的到点铃声不受影响。点一下画面才会开始发声（浏览器的规定）。')));
+      h('p.muted', null, '只关环境声时，番茄钟的到点铃声照样会响；静音时不响，只弹通知。点一下画面才会开始发声（浏览器的规定）。')));
 
     /* ---------- 安装 ---------- */
     const installed = matchMedia('(display-mode: standalone)').matches;
@@ -79,7 +82,7 @@ const Settings = {
     kids.push(h('section.set', null,
       h('h3', null, '关于'),
       h('p.muted', null, `任务 ${d.tasks.length} 个 · 习惯 ${d.habits.length} 个 · 番茄 ${d.pomos.length} 个`),
-      h('p.muted', null, '快捷键：数字键 1 / 2 / 3 切换雨 / 雪 / 樱；拖动画面旋转，滚轮缩放，点水面起涟漪。')));
+      h('p.muted', null, '快捷键：数字键 1 / 2 / 3 切换雨 / 雪 / 樱，M 静音；拖动画面旋转，滚轮缩放，点水面起涟漪。')));
 
     this.el.root.replaceChildren(...kids);
   },

@@ -97,19 +97,20 @@ const App = {
   },
 };
 
-/* 场景里换了天气 / 主题（点画布图标、色板或按 1/2/3）→ 记下来 */
+/* 场景里换了天气 / 主题 / 静音（点画布图标、色板，或按 1/2/3、M）→ 记下来 */
 function onSceneChange(){
   App.themeVars();
   if (!Store.data) return;
   const s = Store.data.settings;
-  if (s.weather === weatherIdx && s.theme === themeIdx) return;
-  Store.update(d => { d.settings.weather = weatherIdx; d.settings.theme = themeIdx; });
+  if (s.weather === weatherIdx && s.theme === themeIdx && s.muted === muted) return;
+  Store.update(d => { d.settings.weather = weatherIdx; d.settings.theme = themeIdx; d.settings.muted = muted; });
 }
 /* 导入 / 恢复了一份备份之后：把场景和声音也调成备份里的设置 */
 function onDataReplaced(){
   const s = Store.data.settings;
   setThemeNow(s.theme); setWeatherNow(s.weather); setAmbience(WEATHERS[weatherIdx].key);
   setAmbientOn(s.ambient);
+  setMuted(s.muted);
   App.themeVars();
   Pomo.refresh();
 }
@@ -123,7 +124,7 @@ function onDataReplaced(){
     return;
   }
   const s = Store.data.settings;
-  setThemeNow(s.theme); setWeatherNow(s.weather); ambOn = s.ambient;
+  setThemeNow(s.theme); setWeatherNow(s.weather); ambOn = s.ambient; muted = s.muted;
   App.themeVars();
   const wasOpen = App.open;
   App.build();

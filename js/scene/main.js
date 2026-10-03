@@ -32,6 +32,7 @@ function frame(now){
   drawWeatherFront(centerDepth);   // 近处的雨 / 空中的雪与花瓣
   drawSwatches();
   drawWeatherBtns();
+  drawMuteBtn();
   requestAnimationFrame(frame);
 }
 
@@ -45,6 +46,7 @@ cv.addEventListener('pointerdown', e => {
   if (sw >= 0){ switchTheme(sw); return; }   // 点色板：只换色，不动相机、不生涟漪
   const wb = hitWeatherBtn(e.clientX, e.clientY);
   if (wb >= 0){ switchWeather(wb); return; } // 点天气图标：只换天气
+  if (hitMuteBtn(e.clientX, e.clientY)){ toggleMute(); return; }   // 点小喇叭：静音 / 恢复
   cv.setPointerCapture(e.pointerId);
   pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   if (pointers.size === 1){
@@ -58,10 +60,10 @@ cv.addEventListener('pointerdown', e => {
 });
 cv.addEventListener('pointermove', e => {
   if (!pointers.size){ // 非拖拽时：色板 / 天气图标悬停检测
-    const h = hitSwatch(e.clientX, e.clientY), hw = hitWeatherBtn(e.clientX, e.clientY);
-    if (h !== hoverIdx || hw !== wHoverIdx){
-      hoverIdx = h; wHoverIdx = hw;
-      cv.style.cursor = (h >= 0 || hw >= 0) ? 'pointer' : '';
+    const h = hitSwatch(e.clientX, e.clientY), hw = hitWeatherBtn(e.clientX, e.clientY), hm = hitMuteBtn(e.clientX, e.clientY);
+    if (h !== hoverIdx || hw !== wHoverIdx || hm !== muteHover){
+      hoverIdx = h; wHoverIdx = hw; muteHover = hm;
+      cv.style.cursor = (h >= 0 || hw >= 0 || hm) ? 'pointer' : '';
     }
   }
   if (!pointers.has(e.pointerId)) return;
@@ -132,11 +134,12 @@ window.addEventListener('keydown', e => {
       (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_' || e.key === '0' ||
        e.key === ')' || e.key === '(')) e.preventDefault();
 });
-// 数字键 1 / 2 / 3：雨 / 雪 / 樱
+// 数字键 1 / 2 / 3：雨 / 雪 / 樱；M：静音 / 恢复
 window.addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey || typing(e)) return;
   const i = ['1', '2', '3'].indexOf(e.key);
   if (i >= 0) switchWeather(i);
+  if (e.key === 'm' || e.key === 'M') toggleMute();
 });
 
 /* ---------- 启动 ---------- */
