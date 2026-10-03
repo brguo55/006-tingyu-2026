@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>听雨</title>
+<meta name="description" content="听雨 · 一边听雨一边做事：任务、番茄钟、习惯打卡。数据只存在你自己的电脑里。">
+<meta name="theme-color" content="#f3ecdd">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/scene.css">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<canvas id="c"></canvas>
+<!--
+  听雨（纯前端 PWA，零依赖、无构建；数据存在本机 IndexedDB）
+    assets/rain-sound.js   录制的雨声（base64，约 2MB，异步加载不阻塞首帧）
+    js/scene/              背景水景：雨 / 雪 / 樱（来自 006-weather-simulator-2026）
+    js/app/util.js         DOM 小工具 / 日期
+    js/app/store.js        数据：IndexedDB 读写、版本升级
+    js/app/backup.js       备份：自动备份到文件夹 / 导出导入 / 状态
+    js/app/tasks.js        任务
+    js/app/pomodoro.js     番茄钟
+    js/app/habits.js       习惯打卡
+    js/app/settings.js     设置页
+    js/app/app.js          面板外壳与启动
+    sw.js                  离线缓存
+-->
+<script src="assets/rain-sound.js" id="rain-sound" async></script>
+<script src="js/scene/engine.js"></script>
+<script src="js/scene/palette.js"></script>
+<script src="js/scene/scene.js"></script>
+<script src="js/scene/effects/rain.js"></script>
+<script src="js/scene/effects/snow.js"></script>
+<script src="js/scene/effects/sakura.js"></script>
+<script src="js/scene/weather.js"></script>
+<script src="js/scene/ui.js"></script>
+<script src="js/scene/audio.js"></script>
+<script src="js/scene/main.js"></script>
+<script src="js/app/util.js"></script>
+<script src="js/app/store.js"></script>
+<script src="js/app/backup.js"></script>
+<script src="js/app/tasks.js"></script>
+<script src="js/app/pomodoro.js"></script>
+<script src="js/app/habits.js"></script>
+<script src="js/app/settings.js"></script>
+<script src="js/app/app.js"></script>
+</body>
+</html>

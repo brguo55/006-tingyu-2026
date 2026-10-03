@@ -1,0 +1,16 @@
+{
+  "name": "听雨",
+  "short_name": "听雨",
+  "description": "一边听雨一边做事：任务、番茄钟、习惯打卡。数据只存在你自己的电脑里。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f3ecdd",
+  "theme_color": "#f3ecdd",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
