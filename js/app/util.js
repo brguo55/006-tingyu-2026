@@ -58,6 +58,8 @@ function ago(ts){
   return Math.floor(s / 86400) + ' 天前';
 }
 
+const rgb = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+
 const mmss = ms => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${pad2(Math.floor(s / 60))}:${pad2(s % 60)}`; };
 
 /* 轻提示（右下角一张小纸条，几秒后消失） */

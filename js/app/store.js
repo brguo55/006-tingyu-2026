@@ -60,6 +60,7 @@ function freshData(){
     habits: [],
     checks: {},          // { 习惯id: { 'YYYY-MM-DD': 1 } }
     pomos: [],           // { id, start, end, minutes, taskId }
+    countdowns: [],      // { id, name, date: 'YYYY-MM-DD', yearly, color, createdAt }
     settings: { weather: 0, theme: 2, ambient: true, muted: false, focusMin: 25, shortMin: 5, longMin: 15, longEvery: 4 },
     meta: { createdAt: now, updatedAt: now },
   };
@@ -71,7 +72,7 @@ function migrate(d){
   const out = Object.assign({}, base, d);
   out.settings = Object.assign({}, base.settings, d.settings);
   out.meta = Object.assign({}, base.meta, d.meta);
-  for (const k of ['lists', 'tasks', 'habits', 'pomos']) if (!Array.isArray(out[k])) out[k] = [];
+  for (const k of ['lists', 'tasks', 'habits', 'pomos', 'countdowns']) if (!Array.isArray(out[k])) out[k] = [];
   if (!out.checks || typeof out.checks !== 'object') out.checks = {};
   if (!out.lists.some(l => l.id === 'inbox')) out.lists.unshift(base.lists[0]);
   out.version = DATA_VERSION;

@@ -25,6 +25,15 @@ function parseQuickDue(raw){
   return title ? { title, due } : { title: raw.trim(), due: null };
 }
 
+/* 轻重（四象限）：任务的 quad 字段取 1–4，没有就是未分类。颜色取自水体主题 */
+const QUADS = {
+  1: { act: '马上做', name: '重要 · 紧急',   theme: 4 },
+  2: { act: '排时间', name: '重要 · 不紧急', theme: 2 },
+  3: { act: '顺手做', name: '紧急 · 不重要', theme: 6 },
+  4: { act: '放一放', name: '不重要 · 不紧急', theme: 5 },
+};
+const quadVars = q => ({ '--qc': rgb(THEMES[QUADS[q].theme].W), '--qk': rgb(THEMES[QUADS[q].theme].DK) });
+
 const Tasks = {
   view: 'today',     // 'today' | 'all' | 清单 id
   query: '',
@@ -141,6 +150,7 @@ const Tasks = {
           (this.view === 'today' || this.view === 'all' || this.query) && list && list.id !== 'inbox' ? h('span', null, list.name) : null,
           t.notes ? h('span', null, '有备注') : null,
           pomos ? h('span.pomo-n', null, `番茄 ×${pomos}`) : null,
+          QUADS[t.quad] ? h('span.qtag', { style: quadVars(t.quad), title: QUADS[t.quad].name }, QUADS[t.quad].act) : null,
         ),
       ),
     );
@@ -155,6 +165,9 @@ const Tasks = {
         h('label', null, '截止 ', h('input', { type: 'date', value: t.due || '', onchange: e => set('due', e.target.value || null) })),
         h('label', null, '清单 ', h('select', { onchange: e => set('listId', e.target.value) },
           ...Store.data.lists.map(l => h('option', { value: l.id, selected: l.id === t.listId }, l.name)))),
+        h('label', null, '轻重 ', h('select', { onchange: e => set('quad', +e.target.value || null) },
+          h('option', { value: '' }, '未分类'),
+          ...Object.entries(QUADS).map(([q, x]) => h('option', { value: q, selected: +q === t.quad }, `${x.act}（${x.name}）`)))),
       ),
       h('div.t-actions', null,
         t.done ? null : h('button.btn', { onclick: () => { Pomo.setTask(t.id); App.showTab('pomo'); } }, '开始专注'),

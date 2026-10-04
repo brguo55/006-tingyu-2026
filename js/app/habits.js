@@ -6,7 +6,6 @@
 /* 习惯的颜色：取自水体主题（淡彩 + 深一阶） */
 const HABIT_COLORS = [2, 3, 4, 5, 6, 0].map(i => ({ name: THEMES[i].name, fill: THEMES[i].W, ink: THEMES[i].DK }));
 const HEAT_WEEKS = 22;
-const rgb = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 
 /* 当前连续 / 最长连续 / 总次数。今天还没打卡不算断：从昨天往前数 */
 function habitStats(checks = {}){

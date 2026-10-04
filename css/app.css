@@ -51,8 +51,8 @@ body.panel-closed #panel, body.immersive #panel{ transform: translateX(calc(100%
 body.panel-closed:not(.immersive) #opener{ display: flex; }
 
 /* 页签：选中的那个下面有一笔水彩 */
-.tabs{ display: flex; gap: 4px; padding: 6px 14px 0; border-bottom: 1px solid var(--line); }
-.tab{ position: relative; border: 0; background: none; cursor: pointer; padding: 8px 12px 10px; font-family: var(--hand); font-size: 18px; color: var(--ink-2); }
+.tabs{ display: flex; gap: 2px; padding: 6px 10px 0; justify-content: space-between; border-bottom: 1px solid var(--line); }
+.tab{ position: relative; border: 0; background: none; cursor: pointer; padding: 8px 8px 10px; font-family: var(--hand); font-size: 17.5px; color: var(--ink-2); white-space: nowrap; }
 .tab:hover{ color: var(--ink); }
 .tab.on{ color: var(--ink); }
 .tab.on::after{ content: ""; position: absolute; left: 8px; right: 6px; bottom: 4px; height: 9px; z-index: -1;
@@ -197,6 +197,52 @@ body.immersive #immersive{ display: block; }
 .h-colors{ display: flex; gap: 8px; margin-top: 10px; }
 .h-color{ width: 20px; height: 20px; cursor: pointer; border: 1.2px solid var(--ink-3); border-radius: 46% 54% 50% 50% / 55% 45% 55% 45%; }
 .h-color.on{ border: 2px solid var(--ink); }
+
+/* ---------- 轻重（四象限） ---------- */
+.page-hint{ margin: 4px 2px 12px; font-size: 12.5px; color: var(--ink-2); line-height: 1.6; }
+.quad-grid{ display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.quad{ --qc: var(--wash); --qk: var(--wash-dk); display: flex; flex-direction: column; min-height: 150px; padding: 8px 8px 6px;
+  border: 1.3px solid var(--qk); border-radius: var(--r2); background: color-mix(in srgb, var(--qc) 22%, transparent); transition: background .15s; }
+.quad.over, .unsorted .over{ background: color-mix(in srgb, var(--qc) 55%, transparent); }
+.quad-head{ display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; }
+.quad-head b{ font-family: var(--hand); font-weight: normal; font-size: 17px; }
+.quad-name{ flex: 1; font-size: 11px; color: var(--ink-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quad-head .n{ font-size: 12px; color: var(--ink-2); }
+.quad-list{ flex: 1; display: flex; flex-direction: column; }
+.q-item{ display: flex; align-items: flex-start; gap: 6px; padding: 4px 0; border-bottom: 1px dashed var(--line); cursor: grab; font-size: 13.5px; }
+.q-item.dragging{ opacity: .4; }
+.q-item .check{ width: 16px; height: 16px; margin-top: 1px; }
+.q-item .check svg{ width: 14px; height: 14px; }
+.q-title{ flex: 1; min-width: 0; line-height: 1.35; word-break: break-word; cursor: pointer; }
+.q-title:hover{ text-decoration: underline dotted; }
+.q-due{ flex: none; font-size: 11px; color: var(--ink-2); margin-top: 2px; }
+.q-due.overdue{ color: var(--warn); }
+.quad-add{ margin-top: 4px; font-size: 13px; padding: 4px 2px; border-bottom-style: dashed; }
+.unsorted{ margin-top: 6px; }
+.unsorted-list{ min-height: 40px; padding: 2px 6px 6px; border-radius: var(--r1); }
+.qtag{ --qc: var(--wash); --qk: var(--wash-dk); padding: 0 6px; border-radius: 6px 8px 5px 9px / 8px 5px 9px 6px;
+  background: color-mix(in srgb, var(--qc) 70%, transparent); border: 1px solid var(--qk); color: var(--ink); }
+
+/* ---------- 倒数 ---------- */
+.cd-add-opts{ display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 10px 2px 4px; font-size: 13.5px; color: var(--ink-2); }
+.cd-list{ display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.cd{ --hc: var(--wash); --hk: var(--wash-dk); border: 1.3px solid var(--line); border-left: 5px solid var(--hc); border-radius: var(--r2); padding: 8px 12px; }
+.cd.open{ border-color: var(--ink-3); border-left-color: var(--hc); }
+.cd.past{ opacity: .75; }
+.cd-main{ display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.cd-text{ flex: 1; min-width: 0; }
+.cd-name{ font-size: 15px; word-break: break-word; }
+.cd-date{ font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+.cd-days{ display: flex; align-items: baseline; gap: 3px; white-space: nowrap; }
+.cd-label, .cd-unit{ font-size: 12.5px; color: var(--ink-2); }
+.cd-num{ font-family: var(--hand); font-size: 28px; line-height: 1; }
+.cd.big{ padding: 16px 16px 14px; border: 1.6px solid var(--hk); border-left-width: 1.6px; background: color-mix(in srgb, var(--hc) 30%, transparent); }
+.cd.big .cd-main{ flex-direction: column; align-items: flex-start; gap: 6px; }
+.cd.big .cd-name{ font-family: var(--hand); font-size: 20px; }
+.cd.big .cd-days{ align-self: flex-end; }
+.cd.big .cd-num{ font-size: 64px; }
+.cd.today .cd-num{ color: var(--warn); }
+.cd-edit{ display: flex; flex-direction: column; gap: 8px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
 
 /* ---------- 设置 ---------- */
 .set{ padding: 4px 0 16px; border-bottom: 1px dashed var(--line); }

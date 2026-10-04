@@ -81,7 +81,7 @@ const Settings = {
     /* ---------- 关于 ---------- */
     kids.push(h('section.set', null,
       h('h3', null, '关于'),
-      h('p.muted', null, `任务 ${d.tasks.length} 个 · 习惯 ${d.habits.length} 个 · 番茄 ${d.pomos.length} 个`),
+      h('p.muted', null, `任务 ${d.tasks.length} 个 · 习惯 ${d.habits.length} 个 · 番茄 ${d.pomos.length} 个 · 倒数日 ${d.countdowns.length} 个`),
       h('p.muted', null, '快捷键：数字键 1 / 2 / 3 切换雨 / 雪 / 樱，M 静音；拖动画面旋转，滚轮缩放，点水面起涟漪。')));
 
     this.el.root.replaceChildren(...kids);

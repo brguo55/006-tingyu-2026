@@ -6,8 +6,10 @@
 
 const TABS = [
   { id: 'tasks',  name: '任务', mod: Tasks },
+  { id: 'matrix', name: '轻重', mod: Matrix },      // 四象限（艾森豪威尔矩阵）
   { id: 'pomo',   name: '番茄', mod: Pomo },
   { id: 'habits', name: '习惯', mod: Habits },
+  { id: 'count',  name: '倒数', mod: Countdown },   // 倒数日
   { id: 'set',    name: '设置', mod: Settings },
 ];
 const PANEL_W = 380, PANEL_GAP = 16, NARROW = 760;
