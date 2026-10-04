@@ -1,6 +1,8 @@
 # 听雨 · Tingyu
 
-A rainy-day planner that runs in the browser: tasks, a pomodoro timer and habit tracking, drawn in pen and watercolor over a small 3D waterscape where it rains, snows or drops cherry blossoms.
+A planner that runs in the browser: tasks, a pomodoro timer and habit tracking, drawn in pen and watercolor.
+
+> **Branch `chibi-companion` (experiment):** the rain / snow / sakura waterscape is replaced by two animated chibi companions, redrawn in code from artwork commissioned by the repo owner.
 
 **Live:** https://brguo55.github.io/006-tingyu-2026/
 
@@ -11,7 +13,7 @@ A rainy-day planner that runs in the browser: tasks, a pomodoro timer and habit 
 - **轻重 (Eisenhower matrix)** — tag tasks 马上做 / 排时间 / 顺手做 / 放一放 (important × urgent). Add tasks inside a quadrant and drag them between quadrants.
 - **Habits** — daily check-ins, current and best streaks, and a 22-week watercolor grid.
 - **倒数 (countdowns)** — days until an exam, trip or deadline. Yearly ones (birthdays, anniversaries) repeat and show which year it is; past dates count up.
-- **Scene** — rain, snow or sakura (keys 1 / 2 / 3) with matching ambient sound, a mute button (key M), and seven water colors that also tint the panel. Drag to rotate, scroll to zoom, and click the water to make ripples.
+- **Companions** — a pink-haired knight and a white-haired companion with a red crown, each with a little bird. Pick one or both in Settings. They breathe, blink, follow the cursor and sip tea. Click them, finish a task, check a habit or end a pomodoro and they clink mugs, with hearts. There's a mute button (key M) and seven colors that also tint the panel.
 - **Offline & installable** — install it as an app from Chrome or Edge.
 
 ## Your data
@@ -36,9 +38,8 @@ python3 -m http.server 8000
 
 ```
 index.html, manifest.webmanifest, sw.js
-css/          scene.css (canvas), app.css (panel)
-js/scene/     the waterscape: engine, palette, effects (rain / snow / sakura), audio
+css/          stage.css (canvas), app.css (panel)
+js/stage/     the companions (chibi.js), palette, canvas controls, audio
 js/app/       util, store (IndexedDB), backup, tasks, pomodoro, habits, settings, app shell
-assets/       recorded rain loop (base64 WAV)
 icons/        app icons
 ```

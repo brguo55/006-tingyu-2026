@@ -1,6 +1,6 @@
 "use strict";
 /* ============================================================
-   app/settings.js：设置页 —— 备份（最重要）/ 声音 / 安装 / 关于
+   app/settings.js：设置页 —— 备份（最重要）/ 陪伴的小人 / 声音 / 安装 / 关于
    ============================================================ */
 
 const Settings = {
@@ -55,20 +55,23 @@ const Settings = {
         h('li', null, '清除浏览器的「Cookie 和网站数据」、卸载 App 时勾选「同时清除数据」，都会删掉本机数据；有备份就能找回。'),
         h('li', null, B.persisted ? '浏览器已答应：空间紧张时也不会自动清掉听雨的数据。' : '建议用 Chrome / Edge 并安装成 App，数据更稳；Safari 会清掉一段时间没打开的网站数据。'))));
 
+    /* ---------- 陪伴的小人 ---------- */
+    const pick = (mode, label) => h('button.chip' + (d.settings.companion === mode ? '.on' : ''), { onclick: () => {
+      Store.update(dd => { dd.settings.companion = mode; });
+      Chibi.setMode(mode);
+    } }, label);
+    kids.push(h('section.set', null,
+      h('h3', null, '陪伴的小人'),
+      h('div.chips', null, pick('A', '粉发骑士'), pick('B', '白发红冠'), pick('both', '两个一起')),
+      h('p.muted', null, '点小人会碰杯（只有一个人时是举杯）；完成任务、打卡、番茄结束时也会。点小鸟它会跳一下。')));
+
     /* ---------- 声音 ---------- */
     kids.push(h('section.set', null,
       h('h3', null, '声音'),
       h('label.switch', null,
         checkBox(d.settings.muted, () => toggleMute(), '静音'),
-        ' 静音（所有声音，包括番茄钟铃声；画面左上角的小喇叭或按 M 也能切换）'),
-      h('label.switch', null,
-        checkBox(d.settings.ambient, () => {
-          const on = !Store.data.settings.ambient;
-          Store.update(dd => { dd.settings.ambient = on; });
-          setAmbientOn(on);
-        }, '环境声'),
-        ' 环境声（雨声 / 风声 / 风铃）'),
-      h('p.muted', null, '只关环境声时，番茄钟的到点铃声照样会响；静音时不响，只弹通知。点一下画面才会开始发声（浏览器的规定）。')));
+        ' 静音（碰杯声、番茄钟铃声；画面左上角的小喇叭或按 M 也能切换）'),
+      h('p.muted', null, '点一下画面才会开始发声（浏览器的规定）。')));
 
     /* ---------- 安装 ---------- */
     const installed = matchMedia('(display-mode: standalone)').matches;
@@ -82,7 +85,7 @@ const Settings = {
     kids.push(h('section.set', null,
       h('h3', null, '关于'),
       h('p.muted', null, `任务 ${d.tasks.length} 个 · 习惯 ${d.habits.length} 个 · 番茄 ${d.pomos.length} 个 · 倒数日 ${d.countdowns.length} 个`),
-      h('p.muted', null, '快捷键：数字键 1 / 2 / 3 切换雨 / 雪 / 樱，M 静音；拖动画面旋转，滚轮缩放，点水面起涟漪。')));
+      h('p.muted', null, '快捷键：M 静音。点小人碰杯，点小鸟让它跳一下，点底部色板换颜色。')));
 
     this.el.root.replaceChildren(...kids);
   },
