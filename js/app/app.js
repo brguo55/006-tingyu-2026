@@ -107,11 +107,10 @@ function onSceneChange(){
   if (s.theme === themeIdx && s.muted === muted) return;
   Store.update(d => { d.settings.theme = themeIdx; d.settings.muted = muted; });
 }
-/* 导入 / 恢复了一份备份之后：把颜色、小人和静音也调成备份里的设置 */
+/* 导入 / 恢复了一份备份之后：把颜色和静音也调成备份里的设置 */
 function onDataReplaced(){
   const s = Store.data.settings;
   setThemeNow(s.theme);
-  Chibi.setMode(s.companion);
   setMuted(s.muted);
   App.themeVars();
   Pomo.refresh();
@@ -126,7 +125,7 @@ function onDataReplaced(){
     return;
   }
   const s = Store.data.settings;
-  setThemeNow(s.theme); Chibi.setMode(s.companion); muted = s.muted;
+  setThemeNow(s.theme); muted = s.muted;
   App.themeVars();
   const wasOpen = App.open;
   App.build();

@@ -3,12 +3,12 @@
    （改了文件不用手动改版本号；下次打开就是新版。只有增删文件时才需要改 SHELL）
    用户数据在 IndexedDB 里，与这里的缓存无关，清缓存不会丢数据。
    ============================================================ */
-const CACHE = 'tingyu-chibi-v1';
+const CACHE = 'tingyu-room-v1';
 const SHELL = [
   './', 'index.html', 'manifest.webmanifest',
   'css/stage.css', 'css/app.css',
   'icons/icon.svg', 'icons/icon-192.png', 'icons/icon-512.png',
-  'js/stage/engine.js', 'js/stage/palette.js', 'js/stage/chibi.js',
+  'js/stage/engine.js', 'js/stage/palette.js', 'js/stage/knight.js', 'js/stage/room.js',
   'js/stage/ui.js', 'js/stage/audio.js', 'js/stage/main.js',
   'js/app/util.js', 'js/app/store.js', 'js/app/backup.js', 'js/app/tasks.js', 'js/app/matrix.js',
   'js/app/pomodoro.js', 'js/app/habits.js', 'js/app/countdown.js', 'js/app/settings.js', 'js/app/app.js',

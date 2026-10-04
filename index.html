@@ -16,7 +16,7 @@
 <canvas id="c"></canvas>
 <!--
   听雨（纯前端 PWA，零依赖、无构建；数据存在本机 IndexedDB）
-    js/stage/              背景舞台：两个会动的 Q 版小人（chibi.js）、色板、静音、声音
+    js/stage/              背景舞台：2D 小房间（room.js）、粉发骑士（knight.js）、色板、静音、声音
     js/app/util.js         DOM 小工具 / 日期
     js/app/store.js        数据：IndexedDB 读写、版本升级
     js/app/backup.js       备份：自动备份到文件夹 / 导出导入 / 状态
@@ -31,7 +31,8 @@
 -->
 <script src="js/stage/engine.js"></script>
 <script src="js/stage/palette.js"></script>
-<script src="js/stage/chibi.js"></script>
+<script src="js/stage/knight.js"></script>
+<script src="js/stage/room.js"></script>
 <script src="js/stage/ui.js"></script>
 <script src="js/stage/audio.js"></script>
 <script src="js/stage/main.js"></script>

@@ -2,8 +2,6 @@
 
 A planner that runs in the browser: tasks, a pomodoro timer and habit tracking, drawn in pen and watercolor.
 
-> **Branch `chibi-companion` (experiment):** the rain / snow / sakura waterscape is replaced by two animated chibi companions, redrawn in code from artwork commissioned by the repo owner.
-
 **Live:** https://brguo55.github.io/006-tingyu-2026/
 
 ## Features
@@ -13,7 +11,7 @@ A planner that runs in the browser: tasks, a pomodoro timer and habit tracking, 
 - **轻重 (Eisenhower matrix)** — tag tasks 马上做 / 排时间 / 顺手做 / 放一放 (important × urgent). Add tasks inside a quadrant and drag them between quadrants.
 - **Habits** — daily check-ins, current and best streaks, and a 22-week watercolor grid.
 - **倒数 (countdowns)** — days until an exam, trip or deadline. Yearly ones (birthdays, anniversaries) repeat and show which year it is; past dates count up.
-- **Companions** — a pink-haired knight and a white-haired companion with a red crown, each with a little bird. Pick one or both in Settings. They breathe, blink, follow the cursor and sip tea. Click them, finish a task, check a habit or end a pomodoro and they clink mugs, with hearts. There's a mute button (key M) and seven colors that also tint the panel.
+- **Room** — a small top-down room where a pink-haired knight (redrawn in code from artwork commissioned by the repo owner) walks with WASD, followed by his bunny-eared bird. E is reserved for interactions (none yet). IDLE: breathing, blinking, sipping tea. MOVE: walk cycle. Furniture blocks the way and is depth-sorted. Click the knight, finish a task, check a habit or end a pomodoro and he raises his mug, with hearts. There's a mute button (key M), and the color swatches tint the rug and walls.
 - **Offline & installable** — install it as an app from Chrome or Edge.
 
 ## Your data
@@ -39,7 +37,7 @@ python3 -m http.server 8000
 ```
 index.html, manifest.webmanifest, sw.js
 css/          stage.css (canvas), app.css (panel)
-js/stage/     the companions (chibi.js), palette, canvas controls, audio
+js/stage/     the room (room.js), the knight and bird (knight.js), palette, canvas controls, audio
 js/app/       util, store (IndexedDB), backup, tasks, pomodoro, habits, settings, app shell
 icons/        app icons
 ```
