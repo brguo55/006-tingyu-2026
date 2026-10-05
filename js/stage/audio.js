@@ -71,6 +71,22 @@ function chirp(){
   o.start(t0); o.stop(t0 + 0.2);
 }
 
+/* 二段跳：两下很轻的「扑」（下滑的三角波），像拍了一下翅膀 */
+function flap(){
+  if (!AC || AC.state !== 'running') return;
+  for (const at of [0, 0.07]){
+    const o = AC.createOscillator(), g = AC.createGain(), t0 = AC.currentTime + at;
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(520, t0);
+    o.frequency.exponentialRampToValueAtTime(240, t0 + 0.09);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(0.05, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.11);
+    o.connect(g); g.connect(master);
+    o.start(t0); o.stop(t0 + 0.14);
+  }
+}
+
 /* 番茄钟铃声：三声由低到高的风铃 */
 function bell(){
   if (!AC) return;

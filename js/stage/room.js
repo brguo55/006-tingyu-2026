@@ -2,7 +2,7 @@
 /* ============================================================
    room.js：横版 2D 地图（空洞骑士那种纯侧面）—— 一栋两层的小房子，镜头锁定骑士
    ------------------------------------------------------------
-   A / D 左右走；空格跳（按得越久跳得越高）；站在家具上按 S 跳下来；
+   A / D 左右走；空格跳（按得越久跳得越高），空中再按一次 = 二段跳；站在家具上按 S 跳下来；
    E 互动（接口留好了，目前没有任何互动）；W 先空着（以后进门 / 上楼梯）
    一开始骑士坐在他那把木椅上（原画的姿势），一动就站起来
    动画状态：SIT / IDLE / MOVE / JUMP / FALL，起跳拉长、落地压扁、扬起灰尘
@@ -23,6 +23,9 @@ const KH = 95, KHW = 15;               // 骑士的高 / 半宽（碰撞用）
 const BS = 0.3;                        // 兔耳小鸟的缩放
 /* 手感：参照空洞骑士 —— 起步快、空中可以转向、下落比上升快、松开空格就不再往上 */
 const RUN = 170, GRAV = 1500, FALL_MUL = 1.35, JUMP_V = 562, CUT_V = 210, MAX_FALL = 720;
+const AIR_JUMP_V = 520, AIR_JUMPS = 1;  // 二段跳：比第一跳略低；落地后恢复次数
+const APEX_V = 90, APEX_GRAV = 0.55;   // 按住空格时，快到最高点那一下重力变小 → 有一点悬空感、好控制
+const AIR_CONTROL = 15;                // 空中转向的灵敏度（地面是 22）
 const COYOTE = 0.09, BUFFER = 0.12;    // 走出边缘后还能起跳的时间 / 提前按跳的缓冲
 const FG_PAR = 0.3, FAR_PAR = 0.5;     // 前景比中景多移动 30%；窗外景色只移动一半
 
@@ -53,7 +56,8 @@ const Room = {
   facing: 1,
   sitting: true,                    // 一开始坐在木椅上
   grounded: true, ground: null,     // 站在哪：null = 地板，否则是平台
-  coyote: 0, jumpBuf: 0, jumpHeld: false,
+  coyote: 0, jumpBuf: 0, jumpHeld: false, airJumps: AIR_JUMPS,
+  groundY: FLOOR_Y,                 // 最近一次站稳的高度（镜头按它定高，小跳时不上下晃）
   drop: null, dropUntil: 0,
   sq: [1, 1],                       // 挤压 / 拉伸
   phase: 0, idleFor: 0,
@@ -64,7 +68,7 @@ const Room = {
   look: [0, 0], pointer: null,
   cam: { x: 0, y: 0 }, lookAhead: 0, camReady: false,
   bunny: { x: 1800, y: 860, facing: 1, jump: -1 },
-  hearts: [], puffs: [], puffAcc: 0,
+  hearts: [], puffs: [], feathers: [], puffAcc: 0,
   s: 1, ox: 0, oy: 0,
 
   /* ---------- 布局：镜头画面居中在舞台可用区域，最大 1 倍 ---------- */
@@ -98,7 +102,7 @@ const Room = {
   /* 从椅子上站起来：轻轻一跳落到地上 */
   standUp(dir){
     this.sitting = false; this.sip = -1;
-    this.grounded = false; this.ground = null;
+    this.grounded = false; this.ground = null; this.airJumps = AIR_JUMPS;
     this.vy = -230; this.vx = (dir || 1) * 70;
     this.drop = CHAIR_SEAT; this.dropUntil = this.t + 0.4;
     this.sq = [0.92, 1.08];
@@ -124,6 +128,14 @@ const Room = {
   _burst(x, y, n){
     for (let i = 0; i < n; i++) this.hearts.push({ x: x + rnd(-6, 6), y: y + rnd(-4, 4), vx: rnd(-14, 14), vy: rnd(-48, -30),
       t: 0, life: rnd(1.2, 1.8), size: rnd(5, 8), ph: rnd(0, TAU) });
+  },
+  _featherBurst(){
+    for (let i = 0; i < 8; i++){
+      const a = Math.PI * (0.15 + 0.7 * i / 7);   // 往下半圈散开
+      this.feathers.push({ x: this.x, y: this.y - 6, vx: Math.cos(a) * rnd(60, 130) * (i % 2 ? 1 : -1), vy: Math.sin(a) * rnd(20, 70),
+        rot: rnd(0, TAU), vr: rnd(-6, 6), t: 0, life: rnd(0.45, 0.7), ph: rnd(0, TAU), pink: i % 3 === 0 });
+    }
+    this.puffs.push({ x: this.x, y: this.y, vx: 0, t: 0, big: true, ring: true });
   },
   _dust(x, y, n, spread){
     for (let i = 0; i < n; i++) this.puffs.push({ x: x + rnd(-spread, spread), y, vx: rnd(-1, 1) * spread * 2, t: 0, big: n > 1 });
@@ -180,6 +192,12 @@ const Room = {
       const p = this.puffs[i]; p.t += dt; p.x += p.vx * dt;
       if (p.t > 0.5) this.puffs.splice(i, 1);
     }
+    for (let i = this.feathers.length - 1; i >= 0; i--){
+      const f = this.feathers[i]; f.t += dt;
+      f.vy += 260 * dt; f.vx *= Math.exp(-dt * 3);
+      f.x += (f.vx + Math.sin(f.t * 9 + f.ph) * 14) * dt; f.y += f.vy * dt; f.rot += f.vr * dt;
+      if (f.t > f.life) this.feathers.splice(i, 1);
+    }
     this._camera(dt, walking);
     // 眼睛跟着鼠标
     let lx = 0, ly = 0;
@@ -196,7 +214,7 @@ const Room = {
   _physics(dt, dir){
     const t = this.t;
     // 左右：地上起步 / 刹车很快，空中稍慢但能转向
-    this.vx += (dir * RUN - this.vx) * Math.min(1, dt * (this.grounded ? 22 : 12));
+    this.vx += (dir * RUN - this.vx) * Math.min(1, dt * (this.grounded ? 22 : AIR_CONTROL));
     if (dir) this.facing = dir;
     this.x = clamp(this.x + this.vx * dt, WALL_L + KHW, WALL_R - KHW);
     // 走出平台边缘 → 开始下落（留一点「土狼时间」还能起跳）
@@ -211,11 +229,20 @@ const Room = {
       this.sq = [0.88, 1.14];
       this._dust(this.x, this.y, 1, 4);
       this.sip = -1;
+    } else if (this.jumpBuf > 0 && !this.grounded && this.airJumps > 0){
+      // 二段跳：空中再蹬一下，脚下散开一圈小羽毛
+      this.airJumps--; this.jumpBuf = 0;
+      this.vy = -AIR_JUMP_V;
+      this.sq = [0.84, 1.18];
+      this._featherBurst();
+      flap();
     }
     if (!this.jumpHeld && this.vy < -CUT_V) this.vy = -CUT_V;   // 松开空格：不再往上
     if (this.grounded) return;
-    // 重力（下落更快）+ 落地
-    this.vy = Math.min(MAX_FALL, this.vy + GRAV * (this.vy > 0 ? FALL_MUL : 1) * dt);
+    // 重力（下落更快；按住空格时最高点附近变轻）+ 落地
+    let g = GRAV * (this.vy > 0 ? FALL_MUL : 1);
+    if (this.jumpHeld && Math.abs(this.vy) < APEX_V) g *= APEX_GRAV;
+    this.vy = Math.min(MAX_FALL, this.vy + g * dt);
     const prevY = this.y;
     this.y += this.vy * dt;
     if (this.y - KH < CEIL_Y + 4){ this.y = CEIL_Y + 4 + KH; this.vy = Math.max(0, this.vy); }   // 撞到屋顶
@@ -229,6 +256,7 @@ const Room = {
     if (!land) return;
     const impact = this.vy;
     this.y = landY; this.vy = 0; this.grounded = true; this.ground = land === 'floor' ? null : land;
+    this.airJumps = AIR_JUMPS; this.groundY = landY;
     if (impact > 260){
       const k = Math.min(1, impact / MAX_FALL);
       this.sq = [1 + 0.2 * k, 1 - 0.2 * k];
@@ -240,10 +268,16 @@ const Room = {
   _camera(dt, walking){
     this.lookAhead += (this.facing * (walking ? 90 : 40) - this.lookAhead) * Math.min(1, dt * 1.8);
     const tx = clamp(this.x + this.lookAhead - VIEW_W / 2, 0, MAP_W - VIEW_W);
-    const ty = clamp(this.y - VIEW_H * 0.68, 0, MAP_H - VIEW_H);
+    // 竖直：按「最近站稳的高度」定镜头 → 原地小跳 / 二段跳时镜头不上下晃；
+    // 人快跑出画面上沿 / 下沿（比如从高处往下掉）时才直接跟着人走
+    let refY = this.sitting ? this.y : this.groundY;
+    const sy = this.y - this.cam.y;
+    if (!this.grounded && (sy < VIEW_H * 0.3 || sy > VIEW_H * 0.86)) refY = this.y;
+    if (!this.grounded && this.y > this.groundY + 40) refY = this.y;   // 掉到比原来低的地方
+    const ty = clamp(refY - VIEW_H * 0.68, 0, MAP_H - VIEW_H);
     if (!this.camReady){ this.cam.x = tx; this.cam.y = ty; this.camReady = true; return; }
     this.cam.x += (tx - this.cam.x) * Math.min(1, dt * 5);
-    this.cam.y += (ty - this.cam.y) * Math.min(1, dt * (this.vy > 300 ? 8 : 4));
+    this.cam.y += (ty - this.cam.y) * Math.min(1, dt * (this.vy > 300 ? 7 : 3.5));
   },
 
   draw(){
@@ -262,8 +296,16 @@ const Room = {
     if (!this.sitting) drawArmchair(true, true);
     for (const p of this.puffs){
       const k = p.t / 0.5, r = p.big ? 6 : 4;
+      if (p.ring){ ell(p.x, p.y, 10 + k * 40, 4 + k * 10); ctx.strokeStyle = `rgba(255,255,255,${0.9 * (1 - k)})`; ctx.lineWidth = 3.2; ctx.stroke(); continue; }
       ell(p.x, p.y - 2 - k * 4, r + k * 7, (r + k * 7) * 0.55); fs(`rgba(150,130,110,${0.4 * (1 - k)})`, 0);
     }
+    for (const f of this.feathers){
+      const a = 1 - Math.max(0, (f.t / f.life - 0.5) * 2);
+      ctx.save(); ctx.translate(f.x, f.y); ctx.rotate(f.rot); ctx.globalAlpha = a;
+      ell(0, 0, 8.5, 3.6); fs(f.pink ? COL.pinkHairLt : '#fffdf8', 1.4);
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
     if (this.sitting) drawArmchair(true, false);              // 椅背在骑士身后
     const b = this.bunny;
     const hop = b.jump >= 0 ? Math.sin(b.jump * Math.PI) * 14 : 0;
