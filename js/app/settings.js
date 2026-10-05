@@ -55,10 +55,10 @@ const Settings = {
         h('li', null, '清除浏览器的「Cookie 和网站数据」、卸载 App 时勾选「同时清除数据」，都会删掉本机数据；有备份就能找回。'),
         h('li', null, B.persisted ? '浏览器已答应：空间紧张时也不会自动清掉听雨的数据。' : '建议用 Chrome / Edge 并安装成 App，数据更稳；Safari 会清掉一段时间没打开的网站数据。'))));
 
-    /* ---------- 小房间 ---------- */
+    /* ---------- 小房子 ---------- */
     kids.push(h('section.set', null,
-      h('h3', null, '小房间'),
-      h('p', null, 'WASD 让粉发骑士在房间里走动，E 是互动键（还没有可以互动的东西）。'),
+      h('h3', null, '小房子'),
+      h('p', null, 'A / D 左右走，空格跳（按得越久跳得越高），站在家具上按 S 跳下来。一开始骑士坐在他的木椅上，一动就站起来。房子有一楼（门厅、书房、茶室、放电脑的工作间）和阁楼，镜头会跟着他走；书架、置物板、书桌、窗台、床都能跳上去。E 是互动键（还没有可以互动的东西）。'),
       h('p.muted', null, '点骑士会举杯；完成任务、打卡、番茄结束时也会。点兔耳小鸟它会跳一下。底部色板会换地毯和墙的颜色。')));
 
     /* ---------- 声音 ---------- */
@@ -81,7 +81,7 @@ const Settings = {
     kids.push(h('section.set', null,
       h('h3', null, '关于'),
       h('p.muted', null, `任务 ${d.tasks.length} 个 · 习惯 ${d.habits.length} 个 · 番茄 ${d.pomos.length} 个 · 倒数日 ${d.countdowns.length} 个`),
-      h('p.muted', null, '快捷键：WASD 移动，E 互动，M 静音。')));
+      h('p.muted', null, '快捷键：A / D 走，空格跳，S 下来，E 互动，M 静音。')));
 
     this.el.root.replaceChildren(...kids);
   },

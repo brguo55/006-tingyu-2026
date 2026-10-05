@@ -5,6 +5,8 @@
    drawKnight(k)：以脚底中点为原点、面朝右画（往左走时外面整体镜像）
      IDLE：呼吸起伏、眨眼、头发轻晃、杯子冒热气、站久了喝一口
      MOVE：两腿交替迈步、身体上下颠、后手摆动、头微微前倾
+     JUMP：起跳收腿、后手扬起；FALL：腿垂下微微分开（k.air = 'up' / 'down'）
+     SIT：坐在椅子上（原画的姿势）—— 大腿平放、小腿垂下、后手搭在扶手上（k.sit）
    头部沿用原画坐标（脖子在原画里的 (470, 705)）
    ============================================================ */
 
@@ -91,35 +93,52 @@ function envelope(p, up, hold){
 
 /* ============================================================
    粉发骑士
-   k = { t, moving, phase, blinking, sipW, cheerW, look:[dx,dy] }
+   k = { t, moving, phase, air, sit, blinking, sipW, cheerW, look:[dx,dy] }
    ============================================================ */
 const NECK_Y = -170;   // 脖子离脚底的高度
 
 function drawKnight(k){
-  const { t, moving, phase, sipW, cheerW } = k;
-  const bob = moving ? -Math.abs(Math.sin(phase)) * 9 : Math.sin(t * 2.1) * 2.2;
-  const swing = moving ? Math.sin(phase) : 0;
+  const { t, moving, phase, sipW, cheerW, air, sit } = k;
+  const bob = air ? 0 : moving ? -Math.abs(Math.sin(phase)) * 9 : Math.sin(t * 2.1) * 2.2;
+  const swing = air === 'up' ? -0.9 : air === 'down' ? 0.5 : moving ? Math.sin(phase) : 0;
 
-  // 腿：两只银色护胫，走路时前后交替、抬脚
-  for (const ph of [Math.PI, 0]){
-    const sw = moving ? Math.sin(phase + ph) * 14 : 0;
-    const lift = moving ? Math.max(0, Math.cos(phase + ph)) * 10 : 0;
-    const lx = ph ? -22 : 22;
+  // 坐着：大腿平放、小腿垂下（两条腿前后错开一点）
+  if (sit) for (const [dx, dy] of [[-6, -6], [0, 0]]){
+    capsule([-4 + dx, -60 + dy], [38 + dx, -60 + dy], 30, COL.armor);
+    capsule([38 + dx, -60 + dy], [42 + dx, -12 + dy], 28, COL.armor);
+    ell(38 + dx, -60 + dy, 15, 13); fs(COL.armorLt, 2.4);
+    ell(48 + dx, -6 + dy, 24, 10); fs(COL.armorDk);
+  }
+  // 腿：两只银色护胫，走路时前后交替、抬脚；起跳时收腿，下落时垂下分开
+  if (!sit) for (const ph of [Math.PI, 0]){
+    const back = !!ph;
+    let sw = moving ? Math.sin(phase + ph) * 14 : 0;
+    let lift = moving ? Math.max(0, Math.cos(phase + ph)) * 10 : 0;
+    if (air === 'up'){ sw = back ? -8 : 12; lift = back ? 16 : 24; }
+    if (air === 'down'){ sw = back ? -9 : 9; lift = -3; }
+    const lx = back ? -22 : 22;
     smooth([[lx - 17 + sw, -66], [lx + 17 + sw, -66], [lx + 17 + sw, -8 - lift], [lx - 17 + sw, -8 - lift]]); fs(COL.armor);
     ell(lx + sw, -60, 16, 8); fs(COL.armorLt, 2.4);
     ell(lx + sw + 5, -4 - lift, 24, 10); fs(COL.armorDk);
   }
   // 后手（在身后摆动）
-  capsule([-40, -146 + bob], [-60 - swing * 14, -100 + bob], 26, COL.armor);
-  ell(-60 - swing * 14, -100 + bob, 11, 10); fs(COL.armorLt);
+  const armUp = air === 'up' ? -34 : air === 'down' ? -20 : 0;   // 空中后手扬起保持平衡
+  const backHand = sit ? [-36, -84 + bob] : [-60 - swing * 14, -100 + bob + armUp];   // 坐着时搭在扶手上
+  capsule([-40, -146 + bob], backHand, 26, COL.armor);
+  ell(backHand[0], backHand[1], 11, 10); fs(COL.armorLt);
   // 身体：银甲 + 身前垂下的黄绿色布片
   smooth([[-62, -172 + bob], [60, -174 + bob], [80, -112 + bob], [70, -60 + bob], [-62, -58 + bob], [-80, -110 + bob]]); fs(COL.armor);
   for (const y of [-140, -112, -86]) line([[-62, y + bob], [2, y + 5 + bob], [64, y - 2 + bob]], COL.armorDk, 3);
   line([[-62, -150 + bob], [-70, -88 + bob]], COL.armorLt, 6);
   ctx.save();
   ctx.translate(0, -80 + bob); ctx.rotate(swing * 0.06); ctx.translate(0, 80 - bob);
-  smooth([[-48, -82 + bob], [52, -84 + bob], [60, -34 + bob], [54, -6 + bob], [-44, -6 + bob], [-52, -34 + bob]]); fs(COL.tunic);
-  line([[-12, -70 + bob], [-10, -14 + bob]], COL.tunicDk, 3); line([[24, -72 + bob], [28, -14 + bob]], COL.tunicDk, 3);
+  if (sit){   // 坐着：布片盖在腿上，往前垂
+    smooth([[-48, -82 + bob], [52, -84 + bob], [66, -66 + bob], [70, -40 + bob], [36, -34 + bob], [-44, -46 + bob]]); fs(COL.tunic);
+    line([[10, -70 + bob], [30, -40 + bob]], COL.tunicDk, 3);
+  } else {
+    smooth([[-48, -82 + bob], [52, -84 + bob], [60, -34 + bob], [54, -6 + bob], [-44, -6 + bob], [-52, -34 + bob]]); fs(COL.tunic);
+    line([[-12, -70 + bob], [-10, -14 + bob]], COL.tunicDk, 3); line([[24, -72 + bob], [28, -14 + bob]], COL.tunicDk, 3);
+  }
   line([[-48, -78 + bob], [52, -80 + bob]], COL.tunicDk, 4);
   ctx.restore();
   ell(8, -168 + bob, 52, 15); fs(COL.tunic);            // 领口

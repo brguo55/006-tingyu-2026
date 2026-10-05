@@ -1,76 +1,120 @@
 "use strict";
 /* ============================================================
-   room.js：2D 小房间（俯视）—— 粉发骑士在里面走来走去，兔耳小鸟跟在身后
+   room.js：横版 2D 地图（空洞骑士那种纯侧面）—— 一栋两层的小房子，镜头锁定骑士
    ------------------------------------------------------------
-   WASD 移动；E 互动（接口留好了，目前没有任何互动）
-   动画状态：IDLE（站着：呼吸、眨眼、站久了喝一口）/ MOVE（走路）
-   家具会挡路；按脚底的 y 排前后（走到家具后面会被挡住）
-   点骑士：举杯冒爱心；点小鸟：跳一下。完成任务 / 打卡 / 番茄结束（celebrate）也会举杯
-   坐标：房间自己的「世界坐标」，576 × 480（上面 150 是墙，下面是地板）
+   A / D 左右走；空格跳（按得越久跳得越高）；站在家具上按 S 跳下来；
+   E 互动（接口留好了，目前没有任何互动）；W 先空着（以后进门 / 上楼梯）
+   一开始骑士坐在他那把木椅上（原画的姿势），一动就站起来
+   动画状态：SIT / IDLE / MOVE / JUMP / FALL，起跳拉长、落地压扁、扬起灰尘
+   家具的顶面都是「单向平台」：从下面能穿上去，从上面落下能站住（阁楼的木地板也是）
+   镜头：平滑跟随骑士、朝他走的方向多看一点、到地图边缘停住
+   视差：窗外的景色移动得慢（远），前景的柱子 / 植物移动得快（近）→ 2.5D 的深度
+   ------------------------------------------------------------
+   地图（世界坐标）3600 × 1000，约 4 屏宽、2 屏高；地板 y = 940，阁楼地板 y = 560
+   一楼从左到右：门厅 → 书房（两个高书架，挑高到屋顶）→ 茶室（窗、木椅、茶几）→ 工作间（书桌、电脑）→ 大窗
+   二楼阁楼（x 2100–3560）：床、圆窗、纸箱；从茶室旁边的一排置物板跳上去
    ============================================================ */
 
-const ROOM_W = 576, ROOM_H = 480, WALL_H = 150;
-const KS = 0.2;            // 骑士：局部坐标 → 世界坐标的缩放（人约 105 高）
-const BS = 0.36;           // 兔耳小鸟的缩放
-const SPEED = 150;         // 走路速度（世界单位 / 秒）
-const FOOT = { hw: 16, hh: 7 };   // 脚底碰撞盒的半宽 / 半高
-const BOUNDS = { x0: 26, x1: ROOM_W - 26, y0: WALL_H + 22, y1: ROOM_H - 18 };
+const MAP_W = 3600, MAP_H = 1000, FLOOR_Y = 940, MEZZ_Y = 560, MEZZ_X0 = 2100;
+const WALL_L = 40, WALL_R = 3560, CEIL_Y = 20;
+const VIEW_W = 896, VIEW_H = 504;      // 镜头看到的范围（世界单位，16:9）
+const KS = 0.18;                       // 骑士：局部坐标 → 世界坐标的缩放（人约 95 高）
+const KH = 95, KHW = 15;               // 骑士的高 / 半宽（碰撞用）
+const BS = 0.3;                        // 兔耳小鸟的缩放
+/* 手感：参照空洞骑士 —— 起步快、空中可以转向、下落比上升快、松开空格就不再往上 */
+const RUN = 170, GRAV = 1500, FALL_MUL = 1.35, JUMP_V = 562, CUT_V = 210, MAX_FALL = 720;
+const COYOTE = 0.09, BUFFER = 0.12;    // 走出边缘后还能起跳的时间 / 提前按跳的缓冲
+const FG_PAR = 0.3, FAR_PAR = 0.5;     // 前景比中景多移动 30%；窗外景色只移动一半
 
-/* 家具：box 是挡路的脚底范围（世界坐标），sortY 决定前后，draw 在世界坐标里画 */
-const FURNITURE = [
-  { name: '书架', box: [28, 160, 132, 198], sortY: 198, draw: drawShelf },
-  { name: '书桌', box: [398, 178, 542, 214], sortY: 214, draw: drawDesk },
-  { name: '茶几', box: [256, 324, 346, 356], sortY: 356, draw: drawTeaTable },
-  { name: '木椅', box: [166, 322, 214, 350], sortY: 350, draw: drawChair },
-  { name: '盆栽', box: [508, 424, 554, 452], sortY: 452, draw: drawPlant },
-];
+/* ---------- 能站的面（单向平台）[x0, x1, y] ---------- */
+const PLATS = [];
+const plat = (name, x0, x1, y) => { const p = { name, x0, x1, y }; PLATS.push(p); return p; };
+plat('阁楼', MEZZ_X0, WALL_R, MEZZ_Y);
+plat('鞋凳', 330, 430, 912);
+plat('书架', 636, 764, 700);
+plat('书架', 976, 1104, 650);
+plat('小凳', 860, 910, 900);
+for (const [x0, x1, y] of [[790, 860, 820], [870, 950, 740], [1120, 1200, 570], [1220, 1300, 480], [1300, 1380, 400]]) plat('置物板', x0, x1, y);
+plat('窗台', 1508, 1732, 840);
+const CHAIR_SEAT = plat('木椅', 1814, 1880, 928);
+plat('茶几', 1920, 2020, 910);
+for (const [x0, x1, y] of [[2120, 2200, 860], [2230, 2310, 780], [2120, 2200, 700], [2230, 2310, 620]]) plat('置物板', x0, x1, y);
+plat('转椅', 2400, 2452, 905);
+plat('书桌', 2476, 2704, 870);
+plat('矮书柜', 2756, 2864, 860);
+plat('窗台', 3040, 3260, 860);
+plat('纸箱', 2400, 2460, 520);
+plat('纸箱', 2460, 2512, 480);
+plat('床', 3150, 3360, 520);
 
 const Room = {
   t: 0,
-  x: 300, y: 420,            // 骑士脚底（世界坐标）
+  x: 1840, y: FLOOR_Y, vx: 0, vy: 0,
   facing: 1,
-  moving: false, phase: 0,
-  idleFor: 0,
+  sitting: true,                    // 一开始坐在木椅上
+  grounded: true, ground: null,     // 站在哪：null = 地板，否则是平台
+  coyote: 0, jumpBuf: 0, jumpHeld: false,
+  drop: null, dropUntil: 0,
+  sq: [1, 1],                       // 挤压 / 拉伸
+  phase: 0, idleFor: 0,
   keys: new Set(),
   blink: { at: 1.6, until: 0 },
-  sip: -1, nextSip: 5,
+  sip: -1, nextSip: 3,
   cheer: -1, cheered: false,
   look: [0, 0], pointer: null,
-  bunny: { x: 250, y: 430, facing: 1, hop: 0, jump: -1 },
+  cam: { x: 0, y: 0 }, lookAhead: 0, camReady: false,
+  bunny: { x: 1800, y: 860, facing: 1, jump: -1 },
   hearts: [], puffs: [], puffAcc: 0,
   s: 1, ox: 0, oy: 0,
 
-  /* ---------- 布局：房间居中在舞台可用区域，最大 1 倍（「做小一点」） ---------- */
+  /* ---------- 布局：镜头画面居中在舞台可用区域，最大 1 倍 ---------- */
   layout(){
     const aw = Math.max(240, W - insetR);
-    this.s = Math.max(0.3, Math.min(1, aw * 0.86 / ROOM_W, (H - 200) / ROOM_H));
-    this.ox = CX - ROOM_W / 2 * this.s;
-    this.oy = Math.max(84, (H - 110 - ROOM_H * this.s) / 2 + 30);
+    this.s = Math.max(0.3, Math.min(1, aw * 0.9 / VIEW_W, (H - 200) / VIEW_H));
+    this.ox = CX - VIEW_W / 2 * this.s;
+    this.oy = Math.max(80, (H - 110 - VIEW_H * this.s) / 2 + 20);
   },
-  toWorld(px, py){ return [(px - this.ox) / this.s, (py - this.oy) / this.s]; },
+  toWorld(px, py){ return [(px - this.ox) / this.s + this.cam.x, (py - this.oy) / this.s + this.cam.y]; },
 
   /* ---------- 输入 ---------- */
   keyDown(code){
-    if (['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(code)){ this.keys.add(code); return true; }
+    if (code === 'KeyA' || code === 'KeyD'){ this.keys.add(code); return true; }
+    if (code === 'Space'){ if (!this.jumpHeld){ this.jumpBuf = BUFFER; } this.jumpHeld = true; return true; }
+    if (code === 'KeyS'){ this.dropDown(); return true; }
     if (code === 'KeyE'){ this.interact(); return true; }
+    if (code === 'KeyW') return true;   // 先空着：以后进门 / 上楼梯
     return false;
   },
-  keyUp(code){ this.keys.delete(code); },
-  clearKeys(){ this.keys.clear(); },
-  /* E：互动 —— 先留空，以后在这里判断「面前是什么家具」再决定做什么 */
+  keyUp(code){ this.keys.delete(code); if (code === 'Space') this.jumpHeld = false; },
+  clearKeys(){ this.keys.clear(); this.jumpHeld = false; },
+  /* E：互动 —— 先留空，以后在这里判断「面前是什么家具」再决定做什么（比如坐回椅子、用电脑） */
   interact(){},
+  /* S：从平台上跳下来（地板上按没反应） */
+  dropDown(){
+    if (this.sitting || !this.grounded || !this.ground) return;
+    this.drop = this.ground; this.dropUntil = this.t + 0.3;
+    this.grounded = false; this.ground = null; this.y += 2; this.vy = 80;
+  },
+  /* 从椅子上站起来：轻轻一跳落到地上 */
+  standUp(dir){
+    this.sitting = false; this.sip = -1;
+    this.grounded = false; this.ground = null;
+    this.vy = -230; this.vx = (dir || 1) * 70;
+    this.drop = CHAIR_SEAT; this.dropUntil = this.t + 0.4;
+    this.sq = [0.92, 1.08];
+  },
 
   hit(px, py){
     const [x, y] = this.toWorld(px, py);
     const b = this.bunny;
-    if (Math.hypot(x - b.x, y - (b.y - 14)) < 20) return 'bunny';
-    if (Math.abs(x - this.x) < 34 && y < this.y + 4 && y > this.y - 112) return 'knight';
+    if (Math.hypot(x - b.x, y - b.y) < 18) return 'bunny';
+    if (Math.abs(x - this.x) < 30 && y < this.y + 4 && y > this.y - KH) return 'knight';
     return null;
   },
   click(px, py){
     const who = this.hit(px, py);
     if (who === 'knight') this.doCheer();
-    else if (who === 'bunny'){ this.bunny.jump = 0; this._burst(this.bunny.x, this.bunny.y - 30, 2); chirp(); }
+    else if (who === 'bunny'){ this.bunny.jump = 0; this._burst(this.bunny.x, this.bunny.y - 14, 2); chirp(); }
     return !!who;
   },
   doCheer(){
@@ -81,61 +125,50 @@ const Room = {
     for (let i = 0; i < n; i++) this.hearts.push({ x: x + rnd(-6, 6), y: y + rnd(-4, 4), vx: rnd(-14, 14), vy: rnd(-48, -30),
       t: 0, life: rnd(1.2, 1.8), size: rnd(5, 8), ph: rnd(0, TAU) });
   },
-
-  /* ---------- 碰撞：脚底的小盒子不能进墙、不能进家具 ---------- */
-  _blocked(x, y){
-    if (x - FOOT.hw < BOUNDS.x0 || x + FOOT.hw > BOUNDS.x1 || y - FOOT.hh < BOUNDS.y0 || y + FOOT.hh > BOUNDS.y1) return true;
-    for (const f of FURNITURE){
-      const [x0, y0, x1, y1] = f.box;
-      if (x + FOOT.hw > x0 && x - FOOT.hw < x1 && y + FOOT.hh > y0 && y - FOOT.hh < y1) return true;
-    }
-    return false;
+  _dust(x, y, n, spread){
+    for (let i = 0; i < n; i++) this.puffs.push({ x: x + rnd(-spread, spread), y, vx: rnd(-1, 1) * spread * 2, t: 0, big: n > 1 });
   },
 
   /* ---------- 每帧 ---------- */
   update(dt){
     const t = (this.t += dt);
-    // 移动（WASD，斜着走不会更快）；先走 x 再走 y，撞上就贴着走
-    let dx = (this.keys.has('KeyD') ? 1 : 0) - (this.keys.has('KeyA') ? 1 : 0);
-    let dy = (this.keys.has('KeyS') ? 1 : 0) - (this.keys.has('KeyW') ? 1 : 0);
-    const len = Math.hypot(dx, dy);
-    this.moving = len > 0;
-    if (this.moving){
-      dx /= len; dy /= len;
-      const nx = this.x + dx * SPEED * dt, ny = this.y + dy * SPEED * dt;
-      if (!this._blocked(nx, this.y)) this.x = nx;
-      if (!this._blocked(this.x, ny)) this.y = ny;
-      if (dx) this.facing = dx > 0 ? 1 : -1;
-      this.phase += dt * 11;
-      this.idleFor = 0; this.sip = -1;
-      // 脚下扬起的小灰尘
-      if ((this.puffAcc += dt) > 0.24){ this.puffAcc = 0; this.puffs.push({ x: this.x - this.facing * 10, y: this.y - 2, t: 0 }); }
-    } else {
-      this.phase = 0; this.idleFor += dt;
+    const dir = (this.keys.has('KeyD') ? 1 : 0) - (this.keys.has('KeyA') ? 1 : 0);
+    this.jumpBuf = Math.max(0, this.jumpBuf - dt);
+    if (this.sitting){
+      // 坐着：一按方向键或空格就站起来
+      if (dir || this.jumpBuf > 0){ this.jumpBuf = 0; if (dir) this.facing = dir; this.standUp(dir); }
+      else this.idleFor += dt;
     }
+    if (!this.sitting) this._physics(dt, dir);
+    this.sq[0] += (1 - this.sq[0]) * Math.min(1, dt * 14);
+    this.sq[1] += (1 - this.sq[1]) * Math.min(1, dt * 14);
+    // 走路节奏 / 小灰尘 / 站着不动多久了
+    const walking = !this.sitting && this.grounded && Math.abs(this.vx) > 20;
+    if (walking){
+      this.phase += dt * 11 * Math.abs(this.vx) / RUN;
+      if ((this.puffAcc += dt) > 0.22){ this.puffAcc = 0; this._dust(this.x - this.facing * 9, this.y, 1, 2); }
+      this.idleFor = 0; this.sip = -1;
+    } else if (!this.sitting){ this.phase = 0; if (this.grounded) this.idleFor += dt; else this.idleFor = 0; }
     // 眨眼
     if (t >= this.blink.at){ this.blink.until = t + 0.13; this.blink.at = t + (Math.random() < 0.2 ? 0.28 : rnd(2.5, 5.5)); }
-    // IDLE 久了喝一口
+    // 不动久了喝一口（坐着也会）
     if (this.sip >= 0){ this.sip += dt / 2.2; if (this.sip > 1) this.sip = -1; }
-    else if (!this.moving && this.cheer < 0 && this.idleFor > 3 && t > this.nextSip){ this.sip = 0; this.nextSip = t + rnd(7, 12); }
+    else if ((this.sitting || (this.grounded && !walking)) && this.cheer < 0 && this.idleFor > 3 && t > this.nextSip){ this.sip = 0; this.nextSip = t + rnd(7, 12); }
     // 举杯：到 0.3 时「叮」+ 冒爱心
     if (this.cheer >= 0){
       this.cheer += dt / 1.3;
       if (!this.cheered && this.cheer >= 0.3){
         this.cheered = true; clink();
-        this._burst(this.x + this.facing * 22, this.y - 66, 5);
+        this._burst(this.x + this.facing * 20, this.y - 60, 5);
       }
       if (this.cheer > 1) this.cheer = -1;
     }
-    // 兔耳小鸟跟在身后（落后一点、一蹦一蹦）
-    const b = this.bunny, tx = this.x - this.facing * 40, ty = this.y + 6;
-    const bx = tx - b.x, by = ty - b.y, bd = Math.hypot(bx, by);
-    if (bd > 4){
-      const v = Math.min(bd * 4, SPEED * 1.15) * dt;
-      b.x += bx / bd * v; b.y += by / bd * v;
-      if (Math.abs(bx) > 3) b.facing = bx > 0 ? 1 : -1;
-      b.hop += dt * 12;
-    } else { b.hop = 0; b.facing = this.facing; }
+    // 兔耳小鸟：在骑士身后上方飞着跟随；骑士坐着时停在椅背旁边
+    const b = this.bunny;
+    const [tx, ty] = this.sitting ? [CHAIR_SEAT.x0 - 6, CHAIR_SEAT.y - 74] : [this.x - this.facing * 48, this.y - 96];
+    const k = Math.min(1, dt * 3.5);
+    b.x += (tx - b.x) * k; b.y += (ty - b.y) * k;
+    if (Math.abs(tx - b.x) > 3) b.facing = tx > b.x ? 1 : -1; else b.facing = this.facing;
     if (b.jump >= 0){ b.jump += dt / 0.5; if (b.jump > 1) b.jump = -1; }
     // 粒子
     for (let i = this.hearts.length - 1; i >= 0; i--){
@@ -143,56 +176,121 @@ const Room = {
       p.t += dt; p.x += (p.vx + Math.sin(p.t * 4 + p.ph) * 10) * dt; p.y += p.vy * dt;
       if (p.t > p.life) this.hearts.splice(i, 1);
     }
-    for (let i = this.puffs.length - 1; i >= 0; i--) if ((this.puffs[i].t += dt) > 0.5) this.puffs.splice(i, 1);
+    for (let i = this.puffs.length - 1; i >= 0; i--){
+      const p = this.puffs[i]; p.t += dt; p.x += p.vx * dt;
+      if (p.t > 0.5) this.puffs.splice(i, 1);
+    }
+    this._camera(dt, walking);
     // 眼睛跟着鼠标
     let lx = 0, ly = 0;
     if (this.pointer){
       const [wx, wy] = this.toWorld(this.pointer[0], this.pointer[1]);
-      const ex = this.x + this.facing * 17, ey = this.y - 48;
+      const ex = this.x + this.facing * 15, ey = this.y - 43;
       const ddx = (wx - ex) * this.facing, ddy = wy - ey, d = Math.hypot(ddx, ddy) || 1, m = Math.min(5, d / 12);
       lx = ddx / d * m; ly = ddy / d * m;
     }
-    const k = Math.min(1, dt * 6);
-    this.look[0] += (lx - this.look[0]) * k; this.look[1] += (ly - this.look[1]) * k;
+    const kl = Math.min(1, dt * 6);
+    this.look[0] += (lx - this.look[0]) * kl; this.look[1] += (ly - this.look[1]) * kl;
+  },
+
+  _physics(dt, dir){
+    const t = this.t;
+    // 左右：地上起步 / 刹车很快，空中稍慢但能转向
+    this.vx += (dir * RUN - this.vx) * Math.min(1, dt * (this.grounded ? 22 : 12));
+    if (dir) this.facing = dir;
+    this.x = clamp(this.x + this.vx * dt, WALL_L + KHW, WALL_R - KHW);
+    // 走出平台边缘 → 开始下落（留一点「土狼时间」还能起跳）
+    if (this.grounded && this.ground){
+      const p = this.ground;
+      if (this.x < p.x0 - 6 || this.x > p.x1 + 6){ this.grounded = false; this.ground = null; this.coyote = COYOTE; }
+    }
+    // 跳：提前一点按也算（缓冲），刚走出边缘也能跳（土狼时间）
+    if (!this.grounded) this.coyote = Math.max(0, this.coyote - dt);
+    if (this.jumpBuf > 0 && (this.grounded || this.coyote > 0)){
+      this.vy = -JUMP_V; this.grounded = false; this.ground = null; this.coyote = 0; this.jumpBuf = 0;
+      this.sq = [0.88, 1.14];
+      this._dust(this.x, this.y, 1, 4);
+      this.sip = -1;
+    }
+    if (!this.jumpHeld && this.vy < -CUT_V) this.vy = -CUT_V;   // 松开空格：不再往上
+    if (this.grounded) return;
+    // 重力（下落更快）+ 落地
+    this.vy = Math.min(MAX_FALL, this.vy + GRAV * (this.vy > 0 ? FALL_MUL : 1) * dt);
+    const prevY = this.y;
+    this.y += this.vy * dt;
+    if (this.y - KH < CEIL_Y + 4){ this.y = CEIL_Y + 4 + KH; this.vy = Math.max(0, this.vy); }   // 撞到屋顶
+    if (this.vy < 0) return;
+    let land = null, landY = Infinity;
+    if (this.y >= FLOOR_Y){ land = 'floor'; landY = FLOOR_Y; }
+    for (const p of PLATS){
+      if (p === this.drop && t < this.dropUntil) continue;
+      if (prevY <= p.y + 0.5 && this.y >= p.y && this.x >= p.x0 - 6 && this.x <= p.x1 + 6 && p.y < landY){ land = p; landY = p.y; }
+    }
+    if (!land) return;
+    const impact = this.vy;
+    this.y = landY; this.vy = 0; this.grounded = true; this.ground = land === 'floor' ? null : land;
+    if (impact > 260){
+      const k = Math.min(1, impact / MAX_FALL);
+      this.sq = [1 + 0.2 * k, 1 - 0.2 * k];
+      this._dust(this.x, this.y, 3, 10 * k + 4);
+    }
+  },
+
+  /* 镜头：平滑跟随，朝前多看一点；人站在画面偏下的位置；到地图边缘停住 */
+  _camera(dt, walking){
+    this.lookAhead += (this.facing * (walking ? 90 : 40) - this.lookAhead) * Math.min(1, dt * 1.8);
+    const tx = clamp(this.x + this.lookAhead - VIEW_W / 2, 0, MAP_W - VIEW_W);
+    const ty = clamp(this.y - VIEW_H * 0.68, 0, MAP_H - VIEW_H);
+    if (!this.camReady){ this.cam.x = tx; this.cam.y = ty; this.camReady = true; return; }
+    this.cam.x += (tx - this.cam.x) * Math.min(1, dt * 5);
+    this.cam.y += (ty - this.cam.y) * Math.min(1, dt * (this.vy > 300 ? 8 : 4));
   },
 
   draw(){
     this.layout();
-    const t = this.t;
+    const t = this.t, cam = this.cam;
     ctx.save();
     ctx.translate(this.ox, this.oy);
     ctx.scale(this.s, this.s);
     ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    drawRoomShell(t);
-    // 地上的灰尘
+    ctx.save();
+    ctx.beginPath(); ctx.rect(0, 0, VIEW_W, VIEW_H); ctx.clip();
+    // ---- 中景（世界坐标）：房子、家具、骑士 ----
+    ctx.save();
+    ctx.translate(-cam.x, -cam.y);
+    drawHouse(t, cam);
+    if (!this.sitting) drawArmchair(true, true);
     for (const p of this.puffs){
-      const k = p.t / 0.5;
-      ell(p.x, p.y, 4 + k * 8, 2 + k * 3); fs(`rgba(150,130,110,${0.35 * (1 - k)})`, 0);
+      const k = p.t / 0.5, r = p.big ? 6 : 4;
+      ell(p.x, p.y - 2 - k * 4, r + k * 7, (r + k * 7) * 0.55); fs(`rgba(150,130,110,${0.4 * (1 - k)})`, 0);
     }
-    // 按脚底 y 排前后：家具、骑士、小鸟
+    if (this.sitting) drawArmchair(true, false);              // 椅背在骑士身后
     const b = this.bunny;
-    const items = FURNITURE.map(f => ({ y: f.sortY, draw: () => f.draw(t) }));
-    items.push({ y: this.y, draw: () => this._drawKnight() });
-    items.push({ y: b.y, draw: () => {
-      const hopY = Math.abs(Math.sin(b.hop)) * 7 + (b.jump >= 0 ? Math.sin(b.jump * Math.PI) * 16 : 0);
-      ell(b.x, b.y, 11, 3.5); fs('rgba(90,70,60,0.18)', 0);   // 影子
-      ctx.save(); ctx.translate(b.x, b.y - 16 - hopY + Math.sin(t * 3) * 1.2); ctx.scale(b.facing * BS, BS);
-      LINE_K = 2.2; drawBunny(t, b.hop ? 14 : 9); LINE_K = 1;
-      ctx.restore();
-    } });
-    items.sort((a, c) => a.y - c.y);
-    for (const it of items) it.draw();
+    const hop = b.jump >= 0 ? Math.sin(b.jump * Math.PI) * 14 : 0;
+    ctx.save(); ctx.translate(b.x, b.y - hop + Math.sin(t * 3) * 4); ctx.scale(b.facing * BS, BS);
+    LINE_K = 2.4; drawBunny(t, 16); LINE_K = 1;
+    ctx.restore();
+    this._drawKnight();
+    if (this.sitting) drawArmchair(false, true);              // 扶手和前腿在骑士前面
     drawHeartParticles(this.hearts);
+    ctx.restore();
+    // ---- 前景：比中景移动得多 ----
+    drawForeground(t, cam);
+    ctx.restore();
+    // 画面外框
+    ctx.beginPath(); ctx.rect(0, 0, VIEW_W, VIEW_H); fs(null, WLW + 1.4);
     ctx.restore();
   },
   _drawKnight(){
-    ell(this.x, this.y, 22, 6); fs('rgba(90,70,60,0.18)', 0);   // 脚下的影子
+    if (this.grounded && !this.sitting){ ell(this.x, this.y, 20, 4.5); fs('rgba(90,70,60,0.18)', 0); }   // 脚下的影子
     ctx.save();
     ctx.translate(this.x, this.y);
-    ctx.scale(this.facing * KS, KS);
-    LINE_K = 2.4;
+    ctx.scale(this.facing * KS * this.sq[0], KS * this.sq[1]);
+    LINE_K = 2.5;
     drawKnight({
-      t: this.t, moving: this.moving, phase: this.phase,
+      t: this.t, sit: this.sitting,
+      moving: !this.sitting && this.grounded && Math.abs(this.vx) > 20, phase: this.phase,
+      air: this.sitting || this.grounded ? null : (this.vy < 0 ? 'up' : 'down'),
       blinking: this.blink.until > this.t,
       sipW: envelope(this.sip, 0.28, 0.42), cheerW: envelope(this.cheer, 0.28, 0.3),
       look: this.look,
@@ -203,95 +301,291 @@ const Room = {
 };
 
 /* ============================================================
-   房间和家具（世界坐标，钢笔淡彩）
+   房子和家具（世界坐标，钢笔淡彩，侧面）
    ============================================================ */
 const WLW = 2.2;   // 家具的勾边粗细
 const rgbS = c => `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
+const BOOKS = ['#c96f6a', '#7e9fb0', '#d8b25c', '#8daa86', '#b48ab0', '#e6d6b8'];
+function box(x, y, w, h, fill, lw = WLW){ ctx.beginPath(); ctx.rect(x, y, w, h); fs(fill, lw); }
 
-function drawRoomShell(t){
+function drawHouse(t, cam){
   const tint = curWash();
-  // 墙：纸色里透一点主题色，下面一圈护墙板
-  ctx.beginPath(); ctx.rect(0, 0, ROOM_W, WALL_H); fs(rgbS(lerpC(PAPER, tint, 0.35)), 0);
-  ctx.beginPath(); ctx.rect(0, WALL_H - 34, ROOM_W, 34); fs(rgbS(lerpC([214, 196, 170], tint, 0.15)), 0);
-  line([[0, WALL_H - 34], [ROOM_W, WALL_H - 34]], INKC, 1.6);
-  // 窗：天空 + 慢慢飘的云
-  ctx.save();
-  ctx.beginPath(); ctx.rect(226, 22, 124, 82); ctx.clip();
-  ctx.fillStyle = '#cfe2ea'; ctx.fillRect(226, 22, 124, 82);
-  for (const [cx, cy, r, sp] of [[0, 52, 14, 6], [60, 74, 10, 4]]){
-    const x = 226 + ((cx + t * sp) % 160) - 20;
-    fluffy(x, cy, r * 1.6, r * 0.8, 5, 0.25); fs('rgba(255,255,255,0.9)', 0);
-  }
-  ctx.restore();
-  ctx.beginPath(); ctx.rect(226, 22, 124, 82); fs(null, WLW + 1);
-  line([[288, 22], [288, 104]], INKC, WLW); line([[226, 63], [350, 63]], INKC, WLW);
-  ctx.beginPath(); ctx.rect(218, 102, 140, 8); fs(COL.woodLt, WLW);   // 窗台
-  // 墙上的小画
-  ctx.beginPath(); ctx.rect(160, 44, 40, 48); fs('#f7f1e3', WLW);
-  ell(180, 70, 10, 9); fs(COL.bunny, 1.4); ell(176, 58, 3, 8, -0.3); fs(COL.bunnyEar, 1.2); ell(184, 58, 3, 8, 0.2); fs(COL.bunnyEar, 1.2);
-  // 地板：木板
-  ctx.beginPath(); ctx.rect(0, WALL_H, ROOM_W, ROOM_H - WALL_H); fs('#dcbf98', 0);
-  for (let y = WALL_H + 30, i = 0; y < ROOM_H; y += 30, i++){
-    line([[0, y], [ROOM_W, y]], 'rgba(120,85,55,0.35)', 1.2);
-    for (let x = (i % 2) * 70 + 40; x < ROOM_W; x += 140) line([[x, y - 30], [x, y]], 'rgba(120,85,55,0.25)', 1.1);
-  }
-  line([[0, WALL_H], [ROOM_W, WALL_H]], INKC, WLW);
-  // 地毯（主题色）
-  ell(300, 352, 158, 62); fs(rgbS(tint), WLW);
-  ctx.setLineDash([5, 6]); ell(300, 352, 140, 52); ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 2; ctx.stroke(); ctx.setLineDash([]);
-  // 房间外框
-  ctx.beginPath(); ctx.rect(0, 0, ROOM_W, ROOM_H); fs(null, WLW + 1.4);
+  const wall = rgbS(lerpC(PAPER, tint, 0.35)), wainscot = rgbS(lerpC([214, 196, 170], tint, 0.15));
+  // 外墙 / 屋顶 / 地基
+  box(0, 0, MAP_W, MAP_H, '#5d4636', 0);
+  box(WALL_L, CEIL_Y, WALL_R - WALL_L, FLOOR_Y - CEIL_Y, wall, 0);
+  // 墙纸竖纹（给镜头移动一个参照）
+  for (let x = WALL_L + 30; x < WALL_R; x += 60) line([[x, CEIL_Y], [x, FLOOR_Y]], 'rgba(255,255,255,0.22)', 2);
+  // 护墙板：一楼、阁楼
+  box(WALL_L, FLOOR_Y - 60, WALL_R - WALL_L, 60, wainscot, 0); line([[WALL_L, FLOOR_Y - 60], [WALL_R, FLOOR_Y - 60]], INKC, 1.6);
+  box(MEZZ_X0, MEZZ_Y - 50, WALL_R - MEZZ_X0, 50, wainscot, 0); line([[MEZZ_X0, MEZZ_Y - 50], [WALL_R, MEZZ_Y - 50]], INKC, 1.6);
+  // 屋顶木梁 + 每隔一段一根竖梁
+  box(0, 0, MAP_W, CEIL_Y, COL.woodDk, 0); line([[WALL_L, CEIL_Y], [WALL_R, CEIL_Y]], INKC, 1.6);
+  for (const x of [560, 1400, 2100, 2900]) box(x - 7, CEIL_Y, 14, (x >= MEZZ_X0 ? MEZZ_Y : FLOOR_Y) - CEIL_Y, rgbS(lerpC([180, 140, 105], tint, 0.1)), 1.4);
+  // 窗（窗外景色移动得慢 → 显得远）
+  drawWindow(1520, 640, 200, 200, t, cam);
+  drawWindow(3050, 680, 200, 180, t, cam);
+  drawRoundWindow(2700, 380, 52, t, cam);
+  // 地板
+  box(0, FLOOR_Y, MAP_W, MAP_H - FLOOR_Y, '#c99d71', 0);
+  box(0, FLOOR_Y, MAP_W, 6, '#dcbf98', 0);
+  for (let x = 30; x < MAP_W; x += 80) line([[x, FLOOR_Y + 6], [x, MAP_H]], 'rgba(120,85,55,0.35)', 1.2);
+  line([[0, FLOOR_Y + 24], [MAP_W, FLOOR_Y + 24]], 'rgba(120,85,55,0.3)', 1.1);
+  line([[0, FLOOR_Y], [MAP_W, FLOOR_Y]], INKC, WLW);
+  // 两头的墙
+  box(0, CEIL_Y, WALL_L, FLOOR_Y - CEIL_Y, '#7a5b45', WLW);
+  box(WALL_R, CEIL_Y, MAP_W - WALL_R, FLOOR_Y - CEIL_Y, '#7a5b45', WLW);
+
+  drawEntrance();
+  drawLibrary();
+  drawTeaCorner(t, tint);
+  drawStudy(t);
+  drawRightEnd(t);
+  drawMezzanine(t);
 }
 
-function drawShelf(){
-  ctx.beginPath(); ctx.rect(30, 40, 100, 158); fs(COL.wood, WLW);
-  ctx.beginPath(); ctx.rect(38, 48, 84, 142); fs(COL.woodDk, 0);
-  const books = ['#c96f6a', '#7e9fb0', '#d8b25c', '#8daa86', '#b48ab0', '#e6d6b8'];
-  for (const [y, n] of [[48, 6], [96, 5], [144, 4]]){
-    ctx.beginPath(); ctx.rect(36, y + 44, 88, 5); fs(COL.woodLt, 1.4);
-    for (let i = 0, x = 42; i < n; i++){
-      const w = 9 + (i * 5) % 6, h = 32 + (i * 7) % 10;
-      ctx.beginPath(); ctx.rect(x, y + 44 - h, w, h); fs(books[(i + y) % books.length], 1.4);
+/* 窗：窗框 + 窗台；窗外是天、远山、云（跟着镜头只移动一半） */
+function drawWindow(x, y, w, h, t, cam){
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+  ctx.fillStyle = '#cfe2ea'; ctx.fillRect(x, y, w, h);
+  ctx.save(); ctx.translate(cam.x * FAR_PAR - x * FAR_PAR, cam.y * FAR_PAR * 0.6 - y * FAR_PAR * 0.6);
+  const hx = x - 200, hy = y + h * 0.62;
+  smooth([[hx, hy + 200], [hx, hy + 20], [hx + 120, hy - 14], [hx + 230, hy + 10], [hx + 330, hy - 22], [hx + 460, hy + 8], [hx + 600, hy + 200]]); fs('#a9c3b4', 0);
+  smooth([[hx, hy + 200], [hx, hy + 52], [hx + 160, hy + 30], [hx + 300, hy + 48], [hx + 600, hy + 34], [hx + 600, hy + 200]]); fs('#8fae9c', 0);
+  for (const [cx, cy, r, sp] of [[0, -0.75, 13, 6], [140, -0.45, 9, 4], [260, -0.6, 11, 5]]){
+    const xx = hx + ((cx + t * sp) % 600);
+    fluffy(xx, hy + cy * h * 0.62, r * 1.6, r * 0.8, 5, 0.25); fs('rgba(255,255,255,0.92)', 0);
+  }
+  ctx.restore();
+  ctx.restore();
+  box(x, y, w, h, null, WLW + 1);
+  line([[x + w / 2, y], [x + w / 2, y + h]], INKC, WLW); line([[x, y + h / 2], [x + w, y + h / 2]], INKC, WLW);
+  box(x - 12, y + h, w + 24, 8, COL.woodLt);   // 窗台（能站）
+}
+function drawRoundWindow(cx, cy, r, t, cam){
+  ctx.save();
+  ell(cx, cy, r, r); ctx.clip();
+  ctx.fillStyle = '#d6e6ee'; ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+  ctx.save(); ctx.translate((cam.x - cx) * FAR_PAR, (cam.y - cy) * FAR_PAR * 0.6);
+  for (const [dx, dy, s, sp] of [[-40, -10, 10, 4], [30, 16, 8, 3]]){
+    const xx = cx - 120 + ((dx + 120 + t * sp) % 240);
+    fluffy(xx, cy + dy, s * 1.6, s * 0.8, 5, 0.25); fs('rgba(255,255,255,0.92)', 0);
+  }
+  ctx.restore();
+  ctx.restore();
+  ell(cx, cy, r, r); fs(null, WLW + 2);
+  line([[cx - r, cy], [cx + r, cy]], INKC, WLW); line([[cx, cy - r], [cx, cy + r]], INKC, WLW);
+}
+
+/* ---------- 门厅：门、衣帽架、鞋凳 ---------- */
+function drawEntrance(){
+  box(96, 786, 98, 154, '#8a5d3f');                       // 门框
+  box(104, 794, 82, 146, COL.wood);
+  box(112, 804, 30, 56, COL.woodDk, 1.4); box(148, 804, 30, 56, COL.woodDk, 1.4);
+  box(112, 868, 30, 60, COL.woodDk, 1.4); box(148, 868, 30, 60, COL.woodDk, 1.4);
+  ell(176, 870, 4, 4); fs('#e2c27a', 1.4);
+  smooth([[84, 936], [208, 936], [212, 942], [80, 942]]); fs('#c96f6a', 1.4);   // 门垫
+  // 衣帽架：一件粉斗篷、一顶帽子
+  line([[272, 940], [272, 800]], INKC, 6); line([[272, 940], [272, 800]], COL.woodDk, 3);
+  line([[252, 940], [292, 940]], INKC, 4);
+  line([[272, 812], [258, 822]], INKC, 3); line([[272, 812], [288, 822]], INKC, 3);
+  smooth([[256, 820], [266, 822], [270, 880], [244, 882]]); fs(COL.pinkHairLt, 1.6);
+  ell(290, 828, 12, 5); fs('#7e9fb0', 1.4); ell(290, 822, 7, 6); fs('#7e9fb0', 1.4);
+  // 鞋凳（能站）+ 两双鞋
+  box(330, 912, 100, 8, COL.woodLt); for (const x of [336, 418]) box(x, 920, 6, 20, COL.woodDk);
+  ell(352, 934, 9, 4); fs(COL.armorDk, 1.2); ell(372, 934, 9, 4); fs(COL.armorDk, 1.2);
+}
+
+/* ---------- 书房：两个高书架（挑高到屋顶）、小凳、一路往上的置物板、地图 ---------- */
+function bookshelf(x0, x1, top){
+  box(x0, top, x1 - x0, FLOOR_Y - top, COL.wood);
+  box(x0 + 8, top + 10, x1 - x0 - 16, FLOOR_Y - top - 18, COL.woodDk, 0);
+  for (let y = top + 10, row = 0; y + 54 < FLOOR_Y; y += 54, row++){
+    for (let i = 0, x = x0 + 12; x < x1 - 20; i++){
+      const w = 9 + ((i + row) * 5) % 6, h = 30 + ((i + row) * 7) % 12;
+      box(x, y + 48 - h, w, h, BOOKS[(i + row) % BOOKS.length], 1.3);
       x += w + 2;
     }
+    box(x0 + 4, y + 48, x1 - x0 - 8, 5, COL.woodLt, 1.4);
+  }
+  box(x0 - 4, top - 4, x1 - x0 + 8, 8, COL.woodLt);   // 顶板（能站）
+}
+function wallShelf(x0, x1, y, item){
+  box(x0, y, x1 - x0, 7, COL.woodLt);
+  for (const x of [x0 + 10, x1 - 14]){ smooth([[x, y + 7], [x + 4, y + 7], [x + 4, y + 18]]); fs(COL.woodDk, 1.6); }   // 托架
+  if (item === 'books'){ box(x1 - 30, y - 22, 8, 22, '#7e9fb0', 1.4); box(x1 - 21, y - 18, 7, 18, '#d8b25c', 1.4); }
+  else if (item === 'cactus'){ smooth([[x1 - 22, y], [x1 - 8, y], [x1 - 10, y - 10], [x1 - 20, y - 10]]); fs('#c98a62', 1.4); ell(x1 - 15, y - 17, 5, 8); fs('#8fb08a', 1.4); }
+  else if (item === 'bell'){ smooth([[x1 - 34, y], [x1 - 14, y], [x1 - 18, y - 16], [x1 - 30, y - 16]]); fs('#e2c27a', 1.6); ell(x1 - 24, y - 18, 3, 3); fs('#e2c27a', 1.2); }
+}
+function drawLibrary(){
+  bookshelf(640, 760, 700);
+  bookshelf(980, 1100, 650);
+  box(860, 900, 50, 8, COL.woodLt); box(866, 908, 6, 32, COL.woodDk); box(898, 908, 6, 32, COL.woodDk);   // 小凳
+  wallShelf(790, 860, 820, 'books');
+  wallShelf(870, 950, 740, 'cactus');
+  wallShelf(1120, 1200, 570, 'books');
+  wallShelf(1220, 1300, 480, 'cactus');
+  wallShelf(1300, 1380, 400, 'bell');   // 最高处的小铃铛（以后可以当个小彩蛋）
+  // 墙上的手绘地图
+  box(1180, 700, 130, 90, '#f3e7c9', 1.8);
+  line([[1196, 760], [1226, 730], [1256, 748], [1292, 716]], '#8daa86', 2.6);
+  ell(1240, 744, 6, 4); fs('#7e9fb0', 1.2); line([[1200, 720], [1214, 720]], '#c96f6a', 2);
+}
+
+/* ---------- 茶室：窗、木椅（原画那把，离书架远一点）、茶几、地毯、小画 ---------- */
+function drawArmchair(back, front){
+  const x0 = CHAIR_SEAT.x0, y = CHAIR_SEAT.y;
+  if (back){
+    box(x0 - 8, y - 58, 16, 70, COL.wood);            // 椅背
+    box(x0 - 4, y - 50, 8, 52, COL.woodDk, 0);
+    ell(x0, y - 60, 12, 5); fs(COL.woodLt);
+    box(x0 - 6, y + 4, 8, FLOOR_Y - y - 4, COL.woodDk);   // 后腿
+    box(x0, y - 2, 68, 8, COL.wood);                  // 椅座
+  }
+  if (front){
+    box(x0 - 4, y - 18, 72, 6, COL.wood);             // 扶手
+    box(x0 + 58, y - 14, 9, FLOOR_Y - y + 14, COL.woodDk);   // 前腿
   }
 }
-function drawDesk(t){
-  ctx.beginPath(); ctx.rect(400, 168, 140, 20); fs(COL.woodLt, WLW);   // 桌面
-  ctx.beginPath(); ctx.rect(404, 188, 132, 12); fs(COL.wood, WLW);
-  for (const x of [406, 524]){ ctx.beginPath(); ctx.rect(x, 200, 10, 14); fs(COL.woodDk, WLW); }
-  // 台灯、纸、小杯子
-  ctx.beginPath(); ctx.rect(418, 158, 34, 12); fs('#f7f1e3', 1.4);
-  line([[502, 168], [502, 132]], INKC, 2.4);
-  smooth([[488, 136], [516, 136], [508, 120], [496, 120]]); fs('#efd9a0', 1.8);
-  ell(502, 140, 22, 6); fs(`rgba(255,236,170,${0.25 + Math.sin(t * 2) * 0.05})`, 0);
-  ctx.beginPath(); ctx.rect(462, 152, 14, 16); fs(COL.mugPink, 1.4);
-}
-function drawTeaTable(t){
-  for (const x of [266, 334]){ ctx.beginPath(); ctx.rect(x - 4, 330, 8, 24); fs(COL.woodDk, WLW); }
-  ell(300, 330, 54, 20); fs(COL.wood, WLW);
-  ell(300, 326, 54, 20); fs(COL.woodLt, WLW);
-  // 茶壶 + 两只杯子
-  ell(296, 316, 16, 12); fs('#f7f3ea', 1.8); ell(296, 305, 5, 2.5); fs('#d9cdb8', 1.4);
-  line([[311, 314], [322, 307]], INKC, 4); line([[311, 314], [322, 307]], '#f7f3ea', 2);
-  ell(268, 326, 6, 5); fs(COL.mugPink, 1.4); ell(328, 330, 6, 5); fs('#fdfdfb', 1.4);
+function drawTeaCorner(t, tint){
+  smooth([[1786, FLOOR_Y - 3], [2066, FLOOR_Y - 3], [2070, FLOOR_Y + 2], [1782, FLOOR_Y + 2]]); fs(rgbS(tint), 1.6);   // 地毯（主题色）
+  // 墙上的兔子小画
+  box(1770, 720, 40, 48, '#f7f1e3');
+  ell(1790, 746, 10, 9); fs(COL.bunny, 1.4); ell(1786, 734, 3, 8, -0.3); fs(COL.bunnyEar, 1.2); ell(1794, 734, 3, 8, 0.2); fs(COL.bunnyEar, 1.2);
+  // 茶几 + 茶壶 + 杯子
+  for (const x of [1930, 2006]) box(x, 918, 6, FLOOR_Y - 918, COL.woodDk);
+  box(1918, 910, 104, 8, COL.woodLt);
+  ell(1966, 901, 13, 10); fs('#f7f3ea', 1.8); ell(1966, 891, 4, 2); fs('#d9cdb8', 1.4);
+  line([[1978, 900], [1987, 893]], INKC, 4); line([[1978, 900], [1987, 893]], '#f7f3ea', 2);
+  box(1934, 902, 9, 8, COL.mugPink, 1.4); box(1996, 902, 9, 8, '#fdfdfb', 1.4);
   const ph = (t * 0.5) % 1;
-  line([[296, 298 - ph * 14], [299, 292 - ph * 14], [296, 286 - ph * 14]], `rgba(58,42,40,${Math.sin(ph * Math.PI) * 0.4})`, 1.6);
+  line([[1966, 884 - ph * 14], [1969, 878 - ph * 14], [1966, 872 - ph * 14]], `rgba(58,42,40,${Math.sin(ph * Math.PI) * 0.4})`, 1.6);
+  // 通往阁楼的一排置物板
+  wallShelf(2120, 2200, 860, 'books');
+  wallShelf(2230, 2310, 780);
+  wallShelf(2120, 2200, 700, 'cactus');
+  wallShelf(2230, 2310, 620);
 }
-function drawChair(){
-  // 原画里那把木椅：靠背 + 椅座 + 腿
-  ctx.beginPath(); ctx.rect(170, 282, 12, 66); fs(COL.woodDk, WLW);
-  ctx.beginPath(); ctx.rect(168, 278, 16, 6); fs(COL.woodLt, WLW);
-  ctx.beginPath(); ctx.rect(172, 318, 44, 10); fs(COL.wood, WLW);
-  for (const x of [176, 208]){ ctx.beginPath(); ctx.rect(x - 3, 328, 6, 22); fs(COL.woodDk, WLW); }
-}
-function drawPlant(t){
-  const sway = Math.sin(t * 1.3) * 0.05;
-  ctx.save(); ctx.translate(531, 424); ctx.rotate(sway);
-  for (const [a, l] of [[-0.9, 34], [-0.4, 42], [0.1, 38], [0.6, 34], [-0.15, 28]]){
-    ctx.save(); ctx.rotate(a); ell(0, -l / 2, 8, l / 2); fs('#8fb08a', 1.6); line([[0, -2], [0, -l + 4]], '#6f8f6a', 1.2); ctx.restore();
+
+/* ---------- 工作间：书桌、电脑（显示器里在下雨）、转椅、软木板、挂钟（真实时间） ---------- */
+function drawStudy(t){
+  // 软木板 + 便签
+  box(2370, 680, 100, 76, '#c9a27a', 1.8);
+  for (const [x, y, c] of [[2380, 690, '#f7e98e'], [2410, 702, '#f9cdcf'], [2440, 688, '#cfe2ea'], [2392, 722, '#d6e9c9']]){
+    box(x, y, 20, 18, c, 1.2); ell(x + 10, y + 2, 2, 2); fs('#c96f6a', 0);
   }
+  // 挂钟：真实时间
+  const now = new Date(), cx = 2610, cy = 660;
+  ell(cx, cy, 18, 18); fs('#fbf6ea', 2);
+  const hr = (now.getHours() % 12 + now.getMinutes() / 60) / 12 * TAU, mn = (now.getMinutes() + now.getSeconds() / 60) / 60 * TAU;
+  line([[cx, cy], [cx + Math.sin(hr) * 9, cy - Math.cos(hr) * 9]], INKC, 2.6);
+  line([[cx, cy], [cx + Math.sin(mn) * 13, cy - Math.cos(mn) * 13]], INKC, 1.8);
+  // 转椅（能站）
+  box(2402, 897, 50, 8, '#7e9fb0'); box(2402, 860, 8, 40, '#7e9fb0');
+  line([[2427, 905], [2427, 928]], INKC, 3); line([[2410, 934], [2444, 934]], INKC, 3);
+  ell(2412, 936, 3, 3); fs(INKC, 0); ell(2442, 936, 3, 3); fs(INKC, 0);
+  // 书桌（能站）
+  for (const x of [2484, 2690]) box(x, 878, 8, FLOOR_Y - 878, COL.woodDk);
+  box(2560, 878, 130, 22, COL.wood); ell(2625, 889, 4, 2.5); fs(COL.woodLt, 1.2);
+  box(2474, 868, 232, 10, COL.woodLt);
+  // 主机（桌下）
+  box(2496, 884, 26, 56, '#d9dde6'); ell(2509, 896, 3, 3); fs('#9fd38e', 0); line([[2502, 910], [2516, 910]], '#9aa3b5', 1.4);
+  // 显示器 + 屏幕（里面在下雨 —— 听雨）
+  box(2534, 856, 22, 6, '#9aa3b5', 1.6); box(2541, 842, 8, 16, '#9aa3b5', 1.6);
+  box(2510, 790, 70, 52, '#3f4654', 2.2);
+  ctx.save(); ctx.beginPath(); ctx.rect(2515, 795, 60, 42); ctx.clip();
+  ctx.fillStyle = '#2f4a5c'; ctx.fillRect(2515, 795, 60, 42);
+  for (let i = 0; i < 12; i++){
+    const rx = 2515 + ((i * 37) % 60), ry = 795 + ((t * 60 + i * 23) % 50) - 6;
+    line([[rx, ry], [rx - 2, ry + 6]], 'rgba(200,225,240,0.7)', 1.1);
+  }
+  if ((t % 1) < 0.5) box(2520, 828, 5, 2, '#e8f1f5', 0);   // 闪烁的光标
   ctx.restore();
-  smooth([[512, 422], [550, 422], [546, 452], [516, 452]]); fs('#c98a62', WLW);
-  ctx.beginPath(); ctx.rect(510, 418, 42, 7); fs('#b6774f', WLW);
+  ctx.beginPath(); ctx.moveTo(2510, 842); ctx.lineTo(2580, 842); ctx.lineTo(2620, 940); ctx.lineTo(2470, 940); ctx.closePath();
+  fs('rgba(190,220,240,0.10)', 0);   // 屏幕的光
+  // 键盘 + 鼠标 + 台灯
+  box(2590, 862, 40, 6, '#e6e9ef', 1.4); ell(2642, 865, 5, 3); fs('#e6e9ef', 1.2);
+  line([[2688, 868], [2688, 830]], INKC, 2.4);
+  smooth([[2674, 834], [2702, 834], [2694, 818], [2682, 818]]); fs('#efd9a0', 1.8);
+  ell(2688, 838, 20, 6); fs(`rgba(255,236,170,${0.25 + Math.sin(t * 2) * 0.05})`, 0);
+  // 矮书柜（能站）
+  box(2756, 860, 108, FLOOR_Y - 860, COL.wood);
+  box(2764, 868, 92, 32, COL.woodDk, 0); box(2764, 904, 92, 30, COL.woodDk, 0);
+  for (let i = 0, x = 2768; i < 7; i++){ const w = 9 + (i * 3) % 4; box(x, 872, w, 26, BOOKS[i % BOOKS.length], 1.2); x += w + 2; }
+  box(2752, 856, 116, 8, COL.woodLt);
+}
+
+/* ---------- 右边：大窗旁边的落地灯、坐垫、盆栽 ---------- */
+function drawRightEnd(t){
+  line([[3420, 940], [3420, 820]], INKC, 3.4); line([[3404, 940], [3436, 940]], INKC, 3.4);
+  smooth([[3398, 826], [3442, 826], [3432, 796], [3408, 796]]); fs('#f3e3b8', 1.8);
+  ell(3420, 834, 30, 10); fs(`rgba(255,236,170,${0.22 + Math.sin(t * 1.7) * 0.04})`, 0);
+  ell(3300, 932, 30, 9); fs(COL.pinkHairLt, 1.6); ell(3340, 934, 26, 8); fs('#cfe2ea', 1.6);
+  smooth([[3480, 900], [3520, 900], [3516, 940], [3484, 940]]); fs('#c98a62', WLW);
+  for (const [a, l] of [[-0.6, 50], [-0.2, 64], [0.3, 56]]){
+    ctx.save(); ctx.translate(3500, 900); ctx.rotate(a + Math.sin(t * 1.1) * 0.04);
+    ell(0, -l / 2, 10, l / 2); fs('#8fb08a', 1.6); ctx.restore();
+  }
+}
+
+/* ---------- 阁楼：木地板（单向平台）、床、纸箱、小灯笼 ---------- */
+function drawMezzanine(t){
+  box(MEZZ_X0, MEZZ_Y, WALL_R - MEZZ_X0, 16, COL.woodLt);
+  for (let x = MEZZ_X0 + 60; x < WALL_R; x += 120){ smooth([[x, MEZZ_Y + 16], [x + 10, MEZZ_Y + 16], [x + 10, MEZZ_Y + 34]]); fs(COL.woodDk, 1.6); }
+  // 栏杆（阁楼左边的开口）
+  for (let x = MEZZ_X0 + 4; x < MEZZ_X0 + 64; x += 14) line([[x, MEZZ_Y], [x, MEZZ_Y - 36]], COL.woodDk, 3);
+  box(MEZZ_X0, MEZZ_Y - 40, 66, 6, COL.wood);
+  // 床（能站）：床头、被子、枕头
+  box(3150, 470, 12, 90, COL.wood);
+  box(3150, 520, 210, 22, COL.woodLt);
+  for (const x of [3156, 3350]) box(x, 542, 8, 18, COL.woodDk);
+  smooth([[3168, 520], [3352, 520], [3356, 506], [3240, 500], [3168, 508]]); fs(COL.pinkHairLt, 1.8);
+  ell(3186, 508, 20, 9); fs('#fdfbf6', 1.6);
+  // 纸箱（能站）
+  box(2400, 520, 60, 40, '#d9b48a'); line([[2400, 532], [2460, 532]], '#b48a62', 2);
+  box(2460, 480, 52, 80, '#cfa77c'); line([[2460, 494], [2512, 494]], '#b48a62', 2);
+  // 小灯笼
+  line([[2900, CEIL_Y], [2900, 300]], INKC, 1.6);
+  ell(2900, 318, 14, 18); fs('#f0a75a', 1.8);
+  ell(2900, 318, 26, 26); fs(`rgba(255,200,120,${0.12 + Math.sin(t * 2.4) * 0.04})`, 0);
+  // 一摞书 + 小地毯
+  box(2980, 540, 30, 8, '#7e9fb0', 1.3); box(2984, 532, 24, 8, '#d8b25c', 1.3); box(2982, 524, 28, 8, '#c96f6a', 1.3);
+  smooth([[2620, MEZZ_Y - 2], [2820, MEZZ_Y - 2], [2824, MEZZ_Y + 2], [2616, MEZZ_Y + 2]]); fs('#b48ab0', 1.4);
+}
+
+/* ============================================================
+   前景（离镜头最近）：移动比中景快 FG_PAR 倍；颜色深一点
+   位置按「镜头正对着它时它在哪」来摆
+   ============================================================ */
+function drawForeground(t, cam){
+  const at = (wx, wy) => [(wx - cam.x) + (wx - cam.x - VIEW_W / 2) * FG_PAR, (wy - cam.y) + (wy - cam.y - VIEW_H / 2) * FG_PAR * 0.4];
+  // 藤蔓（从屋顶垂下）
+  for (const [wx, wy, n] of [[300, CEIL_Y, 7], [1180, CEIL_Y, 6], [3000, CEIL_Y, 8], [2050, MEZZ_Y + 16, 5]]){
+    const [x, y] = at(wx, wy);
+    if (x < -80 || x > VIEW_W + 80) continue;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(Math.sin(t * 0.9 + wx) * 0.03);
+    const pts = [[0, 0]]; for (let i = 1; i <= n; i++) pts.push([Math.sin(i * 1.3 + wx) * 8, i * 20]);
+    line(pts, '#4f6e4c', 3);
+    pts.slice(1).forEach(([px, py], i) => { ell(px + (i % 2 ? 7 : -7), py, 10, 5.5, i % 2 ? 0.5 : -0.5); fs('#6d8f69', 1.6); });
+    ctx.restore();
+  }
+  // 深色的木柱（分隔区域，镜头经过时从眼前滑过）
+  for (const wx of [1400, 2980]){
+    const [x] = at(wx, 0);
+    if (x < -80 || x > VIEW_W + 80) continue;
+    box(x - 18, -20, 36, VIEW_H + 40, 'rgba(78,58,44,0.92)', 2.4);
+    line([[x - 8, -20], [x - 8, VIEW_H + 20]], 'rgba(255,255,255,0.08)', 4);
+  }
+  // 大盆栽（地上）
+  for (const wx of [600, 2340, 3180]){
+    const [x, y] = at(wx, FLOOR_Y);
+    if (x < -100 || x > VIEW_W + 100) continue;
+    ctx.save(); ctx.translate(x, y + 20);
+    for (const [a, l] of [[-0.8, 70], [-0.35, 92], [0.1, 84], [0.5, 66], [-0.1, 56]]){
+      ctx.save(); ctx.rotate(a + Math.sin(t * 1.2 + wx) * 0.05); ell(0, -l / 2, 16, l / 2); fs('#5f805b', 1.8); line([[0, -2], [0, -l + 6]], '#4a6747', 1.4); ctx.restore();
+    }
+    smooth([[-28, -6], [28, -6], [24, 40], [-24, 40]]); fs('#8f5f3e', WLW);
+    ctx.restore();
+  }
 }

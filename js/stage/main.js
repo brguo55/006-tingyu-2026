@@ -49,13 +49,17 @@ window.addEventListener('keydown', e => {
       (e.key === '+' || e.key === '=' || e.key === '-' || e.key === '_' || e.key === '0' ||
        e.key === ')' || e.key === '(')) e.preventDefault();
 });
-// WASD 移动、E 互动、M 静音 / 恢复（用 e.code：中文输入法开着也认得）
+// A / D 走、空格跳、S 从家具上下来、E 互动、M 静音（用 e.code：中文输入法开着也认得）
 window.addEventListener('keydown', e => {
   if (e.metaKey || e.ctrlKey || e.altKey || typing(e)) return;
+  if (e.repeat && e.code === 'Space') { e.preventDefault(); return; }   // 按住不放不算连跳
   if (Room.keyDown(e.code)) { e.preventDefault(); return; }
   if (e.code === 'KeyM') toggleMute();
 });
-window.addEventListener('keyup', e => Room.keyUp(e.code));
+window.addEventListener('keyup', e => {
+  Room.keyUp(e.code);
+  if (e.code === 'Space' && !typing(e)) e.preventDefault();   // 别让空格去「点」面板里刚点过的按钮
+});
 // 切走窗口 / 开始在输入框里打字：松开所有方向键，免得骑士一直走
 window.addEventListener('blur', () => Room.clearKeys());
 document.addEventListener('focusin', e => { if (typing(e)) Room.clearKeys(); });
