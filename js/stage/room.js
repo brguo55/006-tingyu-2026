@@ -44,7 +44,7 @@ const CHAIR_SEAT = plat('木椅', 1802, 1848, 916);
 const PERCH = [1806, 824];             // 骑士坐着时，兔耳小鸟停在椅背顶上
 plat('茶几', 1920, 2020, 910);
 for (const [x0, x1, y] of [[2120, 2200, 860], [2230, 2310, 780], [2120, 2200, 700], [2230, 2310, 620]]) plat('置物板', x0, x1, y);
-plat('转椅', 2400, 2452, 905);
+plat('转椅', 2400, 2452, 904);
 plat('书桌', 2476, 2704, 870);
 plat('矮书柜', 2756, 2864, 860);
 plat('窗台', 3040, 3260, 860);
@@ -310,7 +310,7 @@ const Room = {
     if (this.sitting) return 'sit';
     if (!this.grounded) return this.vy < 0 ? 'jump' : 'fall';
     if (this.landT > 0) return 'land';
-    if (this.walking) return ['idle', 'mid', 'pass', 'mid'][Math.floor(this.phase / (Math.PI / 3)) % 4];
+    if (this.walking) return 'walk' + (Math.floor(this.phase / (Math.PI / 4)) % 8);   // 8 帧，满速约 14 帧/秒
     return (this.t % 1.6) < 0.8 ? 'idle' : 'breathe';
   },
   _drawKnight(q){

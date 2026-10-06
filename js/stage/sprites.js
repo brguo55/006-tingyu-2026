@@ -5,7 +5,8 @@
    原图只有一帧（站姿），其余动作都是从它「改」出来的：
      呼吸：身体中间抽掉一行 → 头和肩膀往下沉 1 像素
      眨眼 / 开心（^ ^）：只改眼睛那几个像素
-     走路：后腿往前、前腿往后错开（按行逐渐错位），中间那帧身体抬高 1 像素
+     走路：8 帧，两条腿重新画（大腿 + 小腿 + 靴子，膝盖往前弯），身体一起一伏、两手前后摆、长摆轻晃
+           ——临时手调的，画师交稿后整套换掉
      起跳：膝盖收起（腿抽掉 4 行，整个人往上提）；下落：两腿微微分开；落地：蹲一下（抽掉 2 行）
      坐：上半身照旧，下半身换成画好的坐姿（大腿平放、小腿垂下）
    以后找画师画好真正的帧动画，只要换掉这里的帧就行（Room 只按名字取帧）
@@ -144,25 +145,84 @@ function kEyes(g0, kind){
   }
   return g;
 }
+/* ---------- 走路（8 帧）----------
+   经典走路循环：触地 → 下沉 → 交错（另一只脚抬起来）→ 上升 → 换另一只脚触地 …
+   每帧给出两只脚相对各自髋部的位置（x 偏移、抬起多高），膝盖用两段 IK 算出来、往前弯；
+   上半身、两只手、长摆从原图里切出来，按帧上下起伏 / 前后摆 */
+const WALK_BOB = [0, 1, 0, -1, 0, 1, 0, -1];
+const WALK_FRONT = [[6, 0], [4, 0], [0, 0], [-4, 0], [-7, 0], [-6, 0], [-1, 3], [4, 2]];   // 前腿（画面右边那条）
+const WALK_BACK = [[-6, 0], [-5, 0], [0, 3], [6, 2], [10, 0], [7, 0], [2, 0], [-3, 0]];    // 后腿（被长摆挡住一半）
+const BOOT_FRONT = ['.k1kkk...', 'k13222k..', 'k1322221k', 'k1111111k', 'kkkkkkkkk'];
+const BOOT_BACK = ['.kkkkk...', 'k12111k..', 'k1211111k', 'k1111111k', 'kkkkkkkkk'];
+const rHalfEven = v => { const f = Math.floor(v), d = v - f; return d > 0.5 ? f + 1 : d < 0.5 ? f : (f % 2 ? f + 1 : f); };
+function kLeg(F, hx, hy, fx, fy, back){
+  const L1 = 9.5, L2 = 9, R = 2.7;
+  const d = Math.min(Math.hypot(fx - hx, fy - hy), L1 + L2 - 0.01), a = Math.atan2(fy - hy, fx - hx);
+  const b = Math.acos(clamp((L1 * L1 + d * d - L2 * L2) / (2 * L1 * d), -1, 1));
+  const kx = hx + L1 * Math.cos(a - b), ky = hy + L1 * Math.sin(a - b);
+  const fill = back ? '1' : '2', lt = back ? '2' : '3';
+  const seg = (x0, y0, x1, y1) => {   // 粗线段：外圈黑边，靠前一侧亮、靠后一侧暗
+    const vx = x1 - x0, vy = y1 - y0, L = Math.hypot(vx, vy) || 1, nx = -vy / L, ny = vx / L;
+    for (let r = 0; r < F.length; r++) for (let c = 0; c < KW; c++){
+      const px = c - KPAD, t = clamp(((px - x0) * vx + (r - y0) * vy) / (L * L), 0, 1);
+      const cx = x0 + vx * t, cy = y0 + vy * t, dd = Math.hypot(px - cx, r - cy);
+      if (dd > R + 0.9) continue;
+      const side = (px - cx) * nx + (r - cy) * ny;
+      F[r][c] = dd > R - 0.4 ? 'k' : side < -1 ? '1' : side > 0.9 ? lt : fill;
+    }
+  };
+  seg(hx, hy, kx, ky); seg(kx, ky, fx, fy);
+  const kr = rHalfEven(ky), kc = rHalfEven(kx) + KPAD;   // 膝盖上的护甲亮点
+  if (F[kr]){ F[kr][kc] = back ? '2' : '3'; if (kc + 1 < KW) F[kr][kc + 1] = 'k'; }
+  const boot = back ? BOOT_BACK : BOOT_FRONT, bx = rHalfEven(fx) - 3 + KPAD, by = rHalfEven(fy) - 1;
+  boot.forEach((row, i) => [...row].forEach((ch, j) => { if (ch !== '.' && F[by + i] && bx + j < KW) F[by + i][bx + j] = ch; }));
+}
+function kWalkCycle(g0){
+  const src = g0.map(r => r.slice(KPAD, KPAD + 26)), at = (r, c) => (src[r] && src[r][c]) || '.';
+  const pick = (r0, r1, c0, c1, ok = () => true) => {
+    const out = [];
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) if (at(r, c) !== '.' && ok(r, c)) out.push([r, c]);
+    return out;
+  };
+  const key = ([r, c]) => r * 100 + c;
+  const lhand = pick(24, 33, 0, 7, (r, c) => !(r < 29 && c > 6));
+  const rhand = pick(28, 33, 21, 25);
+  const hands = new Set([...lhand, ...rhand].map(key));
+  const tab = pick(29, 46, 11, 21, (r, c) => !hands.has(r * 100 + c));
+  const tabSet = new Set(tab.map(key));
+  const body = pick(0, 28, 0, 25, (r, c) => !hands.has(r * 100 + c))
+    .concat(pick(29, 33, 6, 12, (r, c) => !hands.has(r * 100 + c) && !tabSet.has(r * 100 + c)));
+  return WALK_BOB.map((bob, i) => {
+    const F = kBlank(52), [fbx, fby] = WALK_BACK[i], [ffx, ffy] = WALK_FRONT[i];
+    kLeg(F, 8, 31 + bob, 8 + fbx, 47.5 - fby, true);
+    kLeg(F, 16, 31 + bob, 16 + ffx, 47.5 - ffy, false);
+    const put = (r, c, ch) => { if (F[r] && c >= 0 && c < KW) F[r][c] = ch; };
+    const sway = [0, 0, -1, -1, 0, 0, -1, -1][i], swing = ffx >= 3 ? 1 : (ffx <= -3 ? -1 : 0);
+    for (const [r, c] of body) put(r + bob, c + KPAD, at(r, c));
+    for (const [r, c] of tab) put(r + bob, c + KPAD + (r >= 40 ? sway : 0), at(r, c));
+    for (const [r, c] of lhand) put(r + bob, c + KPAD + (r >= 27 ? swing : 0), at(r, c));
+    for (const [r, c] of rhand) put(r + bob, c + KPAD - (r >= 29 ? swing : 0), at(r, c));
+    return F;
+  });
+}
 function kSit(g0){
   return g0.slice(0, 29).map(r => r.slice()).concat(kGrid(KNIGHT_SIT_LEGS));
 }
 
 /* KF[眼睛][动作] = { r: 朝右的画布, l: 朝左的画布, h: 高 }；K_DY：画的时候整体往上挪几像素 */
 const KF = {};
-const K_DY = { pass: -1, jump: -4 };
+const K_DY = { jump: -4 };
 for (const eye of ['open', 'blink', 'happy']){
   const g0 = kEyes(kGrid(KNIGHT_BASE), eye);
   const poses = {
     idle: g0,
     breathe: kDropRows(g0, 21, 1),
-    mid: kWalk(g0, 2, -2, 0),
-    pass: kWalk(g0, 5, -5, 1),
     jump: kDropRows(g0, 37, 4),
     fall: kWalk(g0, -2, 2, 0),
     land: kDropRows(g0, 37, 2),
     sit: kSit(g0),
   };
+  kWalkCycle(g0).forEach((g, i) => { poses['walk' + i] = g; });
   KF[eye] = {};
   for (const [name, g] of Object.entries(poses)){
     const rows = g.map(r => r.join(''));
