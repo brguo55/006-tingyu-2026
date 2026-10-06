@@ -122,13 +122,13 @@ const Pomo = {
     e.modes.replaceChildren(...Object.entries(MODES).map(([k, m]) =>
       h('button.chip' + (t.mode === k ? '.on' : ''), { onclick: () => this.setMode(k), disabled: t.running }, m.name)));
     const started = t.running || t.left < this.dur();
-    e.btns.replaceChildren(
+    e.btns.replaceChildren(...[   // replaceChildren 会把 null 变成文字「null」，先滤掉
       t.running ? h('button.btn.primary', { onclick: () => this.pause() }, '暂停')
                 : h('button.btn.primary', { onclick: () => this.start() }, started ? '继续' : '开始'),
       started ? h('button.btn.ghost', { onclick: () => this.reset() }, '重置') : null,
       h('button.btn.ghost', { onclick: () => this.skip(), title: '直接进入下一段，不计数' }, '跳过'),
       h('button.btn.ghost', { onclick: () => App.immersive(true) }, '沉浸'),
-    );
+    ].filter(Boolean));
     const undone = Store.data.tasks.filter(x => !x.done || x.id === t.taskId);
     e.task.replaceChildren(h('option', { value: '' }, '不关联任务'),
       ...undone.map(x => h('option', { value: x.id, selected: x.id === t.taskId }, x.title)));

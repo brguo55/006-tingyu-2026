@@ -12,18 +12,18 @@ function frame(now){
   if (washT < 1) washT = Math.min(1, washT + dt / WASH_DUR);     // 换主题：地毯 / 墙色慢慢晕开
   Room.update(dt);
 
-  ctx.clearRect(0, 0, W, H);
-  ctx.drawImage(paper, 0, 0, W, H);
+  ctx.imageSmoothingEnabled = false;
+  drawBackground();
   Room.draw();
   drawSwatches();
   drawMuteBtn();
   requestAnimationFrame(frame);
 }
 
-/* 完成一件事（任务 / 打卡 / 番茄）：骑士举杯 */
+/* 完成一件事（任务 / 打卡 / 番茄）：骑士开心地蹦一下、冒爱心 */
 function celebrate(){ Room.doCheer(); }
 
-/* ---------- 交互：点骑士举杯 / 点小鸟 / 色板 / 静音；眼睛跟着鼠标 ---------- */
+/* ---------- 交互：点骑士 / 点小鸟 / 色板 / 静音 ---------- */
 cv.addEventListener('pointerdown', e => {
   initAudio();
   const sw = hitSwatch(e.clientX, e.clientY);
@@ -32,12 +32,10 @@ cv.addEventListener('pointerdown', e => {
   Room.click(e.clientX, e.clientY);
 });
 cv.addEventListener('pointermove', e => {
-  Room.pointer = [e.clientX, e.clientY];
   const h = hitSwatch(e.clientX, e.clientY), hm = hitMuteBtn(e.clientX, e.clientY), hc = Room.hit(e.clientX, e.clientY);
   if (h !== hoverIdx || hm !== muteHover){ hoverIdx = h; muteHover = hm; }
   cv.style.cursor = (h >= 0 || hm || hc) ? 'pointer' : '';
 });
-cv.addEventListener('pointerleave', () => { Room.pointer = null; });
 
 /* ---------- 键盘 ---------- */
 /* 正在面板的输入框里打字时，不触发快捷键 */

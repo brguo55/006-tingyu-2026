@@ -1,6 +1,6 @@
 # 听雨 · Tingyu
 
-A planner that runs in the browser: tasks, a pomodoro timer and habit tracking, drawn in pen and watercolor.
+A planner that runs in the browser: tasks, a pomodoro timer and habit tracking, in pixel art.
 
 **Live:** https://brguo55.github.io/006-tingyu-2026/
 
@@ -9,14 +9,15 @@ A planner that runs in the browser: tasks, a pomodoro timer and habit tracking, 
 - **Tasks** — lists, a Today view, search, notes and due dates. Type 明天 / 周五 / 下周一 at the start or end of a task to set its due date.
 - **Pomodoro** — focus, short and long breaks, linked to a task, daily and weekly stats, and an immersive full-screen mode. It stays accurate in a background tab and resumes after a reload.
 - **轻重 (Eisenhower matrix)** — tag tasks 马上做 / 排时间 / 顺手做 / 放一放 (important × urgent). Add tasks inside a quadrant and drag them between quadrants.
-- **Habits** — daily check-ins, current and best streaks, and a 22-week watercolor grid.
+- **Habits** — daily check-ins, current and best streaks, and a 22-week grid.
 - **倒数 (countdowns)** — days until an exam, trip or deadline. Yearly ones (birthdays, anniversaries) repeat and show which year it is; past dates count up.
-- **House** — a Hollow Knight-style side-view map (about 4 screens wide × 2 tall) with a camera that follows the pink-haired knight, redrawn in code from artwork commissioned by the repo owner. He starts sitting in his wooden armchair. A / D walk, Space jumps (hold for higher, with coyote time, jump buffering and a slight hang at the apex; press again in the air for a double jump with a burst of feathers), and S drops through furniture. E is reserved for interactions (none yet). Areas: entrance, a double-height library with shelves to climb, a tea corner, a study with a computer (it rains on the screen) and a real-time wall clock, plus a loft with a bed, reached by shelf steps. Animations: SIT, IDLE, MOVE, JUMP and FALL, with squash and stretch and dust. Parallax: the view outside the windows moves slower and foreground pillars, ivy and plants move faster. His bunny-eared bird flies along. Click him, finish a task, check a habit or end a pomodoro and he raises his mug, with hearts. There's a mute button (key M), and the color swatches tint the walls and rug.
+- **House** — a pixel-art, Hollow Knight-style side-view map (1800 × 500 pixels, about 4 screens wide × 2 tall) with a camera that follows the pink-haired knight. The knight is the repo owner's own 26 × 52 pixel sprite. He starts sitting in his wooden armchair. A / D walk, Space jumps (hold for higher, with coyote time, jump buffering and a slight hang at the apex; press again in the air for a double jump with a burst of feathers), and S drops through furniture. E is reserved for interactions (none yet). Areas: entrance, a double-height library with shelves to climb, a tea corner, a study with a computer (it rains on the screen) and a real-time wall clock, plus a loft with a bed, reached by shelf steps. Animations: SIT, IDLE (breathing, blinking), MOVE, JUMP, FALL and LAND, plus dust. Parallax: the rainy view outside the windows moves slower and foreground pillars, ivy and plants move faster. His bunny-eared bird flies along. Click him, finish a task, check a habit or end a pomodoro and he hops with a happy face and hearts. There's a mute button (key M), and the color swatches tint the wallpaper and rug.
+- **Pixel UI** — the panel uses the [Fusion Pixel](https://github.com/TakWolf/fusion-pixel-font) font (SIL OFL 1.1, loaded from jsDelivr and cached for offline use), square 2px borders and hard shadows.
 - **Offline & installable** — install it as an app from Chrome or Edge.
 
 ## Art
 
-All art is currently drawn in code (`js/stage/room.js`, `js/stage/knight.js`). An art brief for commissioning real artwork, with reference images, layer breakdown and platform coordinates, is in [`docs/art-brief/`](docs/art-brief/README.md).
+The scene is pixel art at 1 pixel = 2 world units, scaled up by whole numbers so pixels stay square. The house is drawn in code (`js/stage/house.js`). The knight's frames (`js/stage/sprites.js`) are all derived from one hand-drawn 26 × 52 sprite: breathing, blinking, walking, jumping, landing and sitting. Commissioned frame animations can replace them later. An art brief for commissioning real artwork, with reference images, layer breakdown and platform coordinates, is in [`docs/art-brief/`](docs/art-brief/README.md). It still describes the earlier hand-drawn version.
 
 ## Your data
 
@@ -41,7 +42,8 @@ python3 -m http.server 8000
 ```
 index.html, manifest.webmanifest, sw.js
 css/          stage.css (canvas), app.css (panel)
-js/stage/     the room (room.js), the knight and bird (knight.js), palette, canvas controls, audio
+js/stage/     map and controls (room.js), the pixel house (house.js), sprites (sprites.js),
+              pixel helpers (pixel.js), palette, canvas controls, audio
 js/app/       util, store (IndexedDB), backup, tasks, pomodoro, habits, settings, app shell
 icons/        app icons
 ```

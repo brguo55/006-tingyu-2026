@@ -9,6 +9,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" crossorigin="anonymous" href="https://cdn.jsdelivr.net/npm/@fontsource/fusion-pixel-12px-proportional-sc@5.3.0/index.css">
 <link rel="stylesheet" href="css/stage.css">
 <link rel="stylesheet" href="css/app.css">
 </head>
@@ -16,7 +17,8 @@
 <canvas id="c"></canvas>
 <!--
   听雨（纯前端 PWA，零依赖、无构建；数据存在本机 IndexedDB）
-    js/stage/              背景舞台：2D 小房间（room.js）、粉发骑士（knight.js）、色板、静音、声音
+    js/stage/              背景舞台（像素风）：房子的地图与操作（room.js）、房子的画（house.js）、
+                           骑士和小鸟的像素帧（sprites.js）、像素小工具（pixel.js）、色板、静音、声音
     js/app/util.js         DOM 小工具 / 日期
     js/app/store.js        数据：IndexedDB 读写、版本升级
     js/app/backup.js       备份：自动备份到文件夹 / 导出导入 / 状态
@@ -31,8 +33,10 @@
 -->
 <script src="js/stage/engine.js"></script>
 <script src="js/stage/palette.js"></script>
-<script src="js/stage/knight.js"></script>
+<script src="js/stage/pixel.js"></script>
+<script src="js/stage/sprites.js"></script>
 <script src="js/stage/room.js"></script>
+<script src="js/stage/house.js"></script>
 <script src="js/stage/ui.js"></script>
 <script src="js/stage/audio.js"></script>
 <script src="js/stage/main.js"></script>

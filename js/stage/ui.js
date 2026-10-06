@@ -1,93 +1,107 @@
 "use strict";
 /* ============================================================
-   ui.js：画在画布上的手绘控件 —— 底部主题色板 / 左上角静音
+   ui.js：画在画布上的像素控件 —— 背景、镜头外框、底部主题色板、左上角静音
+   界面上的一个「像素」= 2 个 CSS 像素（对齐到屏幕像素，放大后也是方方正正的）
    ============================================================ */
 
-/* ---------- 主题色板（画面底部一行 · 钢笔手绘小方块，与底座同风格） ---------- */
-const NSWATCH = 7;
-const swShapes = [];   // 每个色板的抖动方形（局部坐标，固定不闪）
-for (let i = 0; i < NSWATCH; i++){
-  const pts = [];
-  const cs = [[-0.5,-0.5],[0.5,-0.5],[0.5,0.5],[-0.5,0.5]];
-  for (let e = 0; e < 4; e++){
-    const a = cs[e], b = cs[(e+1)%4];
-    for (let k = 0; k < 4; k++){
-      const t = k/4;
-      pts.push([ a[0]+(b[0]-a[0])*t + rnd(-0.045,0.045), a[1]+(b[1]-a[1])*t + rnd(-0.045,0.045) ]);
-    }
+const uiPx = () => Math.max(1, Math.round(2 * DPR)) / DPR;
+const snapS = v => Math.round(v * DPR) / DPR;
+function fillR(x, y, w, h, col){ ctx.fillStyle = col; ctx.fillRect(x, y, w, h); }
+
+/* ---------- 背景：带一点主题色的纸 + 淡淡的点阵（像方格本） ---------- */
+let bgPat = null, bgPatDpr = 0;
+function drawBackground(){
+  fillR(0, 0, W, H, rgbHex(lerpC(PAPER, curWash(), 0.22)));
+  if (!bgPat || bgPatDpr !== DPR){
+    const u = Math.max(1, Math.round(2 * DPR)), c = pxCanvas(u * 8, u * 8), g = c.getContext('2d');
+    g.fillStyle = 'rgba(62,48,38,0.10)'; g.fillRect(0, 0, u, u);
+    bgPat = ctx.createPattern(c, 'repeat'); bgPatDpr = DPR;
   }
-  pts.push(pts[0]);
-  swShapes.push(pts);
+  ctx.save(); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = bgPat; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.restore();
 }
+
+/* ---------- 镜头外框：像素木框（缺角）+ 硬阴影；u = 场景里一个像素的宽 ---------- */
+function drawViewFrame(x, y, w, h, u){
+  const o = 5 * u;
+  fillR(x - o + 3 * u, y - o + 3 * u, w + 2 * o, h + 2 * o, 'rgba(40,28,24,0.18)');
+  fillR(x - o + u, y - o, w + 2 * o - 2 * u, h + 2 * o, OUTL);
+  fillR(x - o, y - o + u, w + 2 * o, h + 2 * o - 2 * u, OUTL);
+  fillR(x - 4 * u, y - 4 * u, w + 8 * u, h + 8 * u, HC.wm);
+  fillR(x - 4 * u, y - 4 * u, w + 8 * u, u, HC.wl); fillR(x - 4 * u, y - 4 * u, u, h + 8 * u, HC.wl);
+  fillR(x - 4 * u, y + h + 3 * u, w + 8 * u, u, HC.wd); fillR(x + w + 3 * u, y - 4 * u, u, h + 8 * u, HC.wd);
+  for (const [a, b] of [[x - 3 * u, y - 3 * u], [x + w + u, y - 3 * u], [x - 3 * u, y + h + u], [x + w + u, y + h + u]]){
+    fillR(a, b, 2 * u, 2 * u, HC.wdk); fillR(a, b, u, u, HC.gold);
+  }
+  fillR(x - u, y - u, w + 2 * u, h + 2 * u, OUTL);
+}
+
+/* ---------- 主题色板（画面底部一行像素小方块；选中的抬高一点，下面有个小箭头） ---------- */
+const NSWATCH = 7;
 let hoverIdx = -1;
-const SW_BASE = 34, SW_GAP = 20;
 function swatchPos(i){
-  const act = i === themeIdx, hov = i === hoverIdx;
+  const u = uiPx(), act = i === themeIdx, hov = i === hoverIdx, s = 14 * u;
   return {
-    cx: CX + (i - (NSWATCH-1)/2)*(SW_BASE + SW_GAP)*SC,
-    cy: H - (58 + (act ? 4 : (hov ? 2 : 0)))*SC,
-    s: (act ? 40 : (hov ? 37 : SW_BASE))*SC
+    x: snapS(CX + (i - (NSWATCH - 1) / 2) * 24 * u - s / 2),
+    y: snapS(H - 66 - (act ? 3 : (hov ? 1 : 0)) * u),
+    s, u,
   };
 }
 function hitSwatch(px, py){
   for (let i = 0; i < NSWATCH; i++){
-    const { cx, cy, s } = swatchPos(i);
-    if (Math.abs(px - cx) < s*0.62 && Math.abs(py - cy) < s*0.62) return i;
+    const { x, y, s, u } = swatchPos(i);
+    if (px > x - 3 * u && px < x + s + 3 * u && py > y - 3 * u && py < y + s + 4 * u) return i;
   }
   return -1;
 }
 function drawSwatches(){
   for (let i = 0; i < NSWATCH; i++){
-    const { cx, cy, s } = swatchPos(i);
-    const act = i === themeIdx;
-    const P = THEMES[i];
-    const pts = swShapes[i].map(p => [cx + p[0]*s, cy + p[1]*s]);
-    // 水彩填充（透出纸纹）
-    ctx.fillStyle = `rgba(${P.W[0]},${P.W[1]},${P.W[2]},${act ? 0.9 : 0.72})`;
-    ctx.beginPath();
-    ctx.moveTo(pts[0][0], pts[0][1]);
-    for (let k = 1; k < pts.length; k++) ctx.lineTo(pts[k][0], pts[k][1]);
-    ctx.closePath();
-    ctx.fill();
-    // 水彩错位叠层
-    ctx.save();
-    ctx.translate(1.6*SC, 1.2*SC);
-    ctx.fillStyle = `rgba(${P.W[0]},${P.W[1]},${P.W[2]},${act ? 0.35 : 0.26})`;
-    ctx.fill();
-    ctx.restore();
-    // 钢笔勾边（与底座棱线同款笔触，笔宽由 pen 统一随视口缩放）
-    pen(pts, INK, act ? 1.8 : 1.4, act ? 0.9 : 0.68, i*43.7, 0.04);
-    // 当前主题：色板下添一道短横线
-    if (act) pen([[cx-10*SC, cy + s*0.62 + 8*SC],[cx+10*SC, cy + s*0.62 + 8*SC]], INK, 1.6, 0.72, i*17.3, 0);
+    const { x, y, s, u } = swatchPos(i), P = THEMES[i], act = i === themeIdx;
+    fillR(x + u, y + s, s - u, (act ? 3 : 1) * u, 'rgba(40,28,24,0.18)');
+    fillR(x + u, y, s - 2 * u, s, OUTL); fillR(x, y + u, s, s - 2 * u, OUTL);
+    fillR(x + u, y + u, s - 2 * u, s - 2 * u, rgbHex(P.W));
+    fillR(x + u, y + u, s - 2 * u, u, rgbHex(P.LT)); fillR(x + u, y + u, u, s - 2 * u, rgbHex(P.LT));
+    fillR(x + u, y + s - 2 * u, s - 2 * u, u, rgbHex(P.DK)); fillR(x + s - 2 * u, y + u, u, s - 2 * u, rgbHex(P.DK));
+    if (act){   // 小箭头 ▲
+      const cx = x + s / 2 - u / 2;
+      fillR(cx, y + s + 5 * u, u, u, OUTL); fillR(cx - u, y + s + 6 * u, 3 * u, u, OUTL);
+    }
   }
 }
 
-const IC_SNOW = [212,224,232];   // 静音按钮的淡彩
-const wj = a => rnd(-a, a);       // 手抖（局部坐标预生成 → 每帧不闪）
-
-/* ---------- 静音（画面左上角 · 钢笔手绘小喇叭：有声时两道声波，静音时一个叉） ---------- */
-const icSpeaker = [[-0.36,-0.12],[-0.16,-0.12],[0.06,-0.32],[0.06,0.32],[-0.16,0.12],[-0.36,0.12]]
-  .map(q => [q[0] + wj(0.015), q[1] + wj(0.015)]);
-icSpeaker.push(icSpeaker[0]);
-const icWaves = [0.17, 0.31].map(r => {
-  const pts = [];
-  for (let k = 0; k <= 6; k++){ const a = -0.85 + k/6*1.7; pts.push([0.08 + Math.cos(a)*r + wj(0.008), Math.sin(a)*r + wj(0.008)]); }
-  return pts;
-});
-const icCross = [[[0.2,-0.12],[0.42,0.12]], [[0.2,0.12],[0.42,-0.12]]];
+/* ---------- 静音（画面左上角 · 像素小喇叭：有声时两道声波，静音时一个叉） ---------- */
+const SPK_PAL = { k: '#3e3026', w: '#d4e0e8' };
+const SPK_ON = makeSprite([
+  '.....k.......',
+  '....kk....k..',
+  '.kkkwk.k...k.',
+  '.kwwwk..k..k.',
+  '.kwwwk..k..k.',
+  '.kkkwk.k...k.',
+  '....kk....k..',
+  '.....k.......',
+], SPK_PAL);
+const SPK_OFF = makeSprite([
+  '.....k.......',
+  '....kk.......',
+  '.kkkwk.k...k.',
+  '.kwwwk..k.k..',
+  '.kwwwk...k...',
+  '.kkkwk..k.k..',
+  '....kk.k...k.',
+  '.....k.......',
+], SPK_PAL);
 let muteHover = false;
-function muteBtnPos(){ return { cx: 42*SC, cy: (54 - (muteHover ? 2 : 0))*SC, s: (muteHover ? 35 : 32)*SC }; }
+function muteBtnPos(){ const u = uiPx(); return { x: snapS(30), y: snapS(46 - (muteHover ? u : 0)), u }; }
 function hitMuteBtn(px, py){
-  const { cx, cy, s } = muteBtnPos();
-  return Math.abs(px - cx) < s*0.62 && Math.abs(py - cy) < s*0.62;
+  const { x, y, u } = muteBtnPos();
+  return px > x - 3 * u && px < x + 16 * u && py > y - 3 * u && py < y + 11 * u;
 }
 function drawMuteBtn(){
-  const { cx, cy, s } = muteBtnPos();
-  const at = q => [cx + q[0]*s, cy + q[1]*s];
-  const ia = muteHover ? 0.85 : 0.65;
-  const pts = icSpeaker.map(at);
-  fillPoly(pts, IC_SNOW, muted ? 0.45 : 0.75, false);
-  pen(pts, INK, 1.3, ia, 61.7, 0.04);
-  if (muted) icCross.forEach((l, k) => pen(l.map(at), INK, 1.5, ia, 71.3 + k*3.1, 0, false));
-  else icWaves.forEach((l, k) => pen(l.map(at), INK, 1.2, ia * (k ? 0.75 : 1), 81.9 + k*4.7, 0, false));
+  const { x, y, u } = muteBtnPos();
+  ctx.imageSmoothingEnabled = false;
+  ctx.globalAlpha = muteHover ? 1 : 0.8;
+  ctx.drawImage(muted ? SPK_OFF : SPK_ON, x, y, 13 * u, 8 * u);
+  ctx.globalAlpha = 1;
 }

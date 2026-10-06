@@ -68,7 +68,7 @@ const App = {
         h('button.btn.small', { onclick: () => B.exportFile() }, '导出'),
         B.supported ? h('button.btn.small.ghost', { onclick: () => this.showTab('set') }, '设置自动备份') : null);
     }
-    this.el.banner.replaceChildren(...kids);
+    this.el.banner.replaceChildren(...kids.filter(Boolean));
     this.el.banner.hidden = !kids.length;
   },
 

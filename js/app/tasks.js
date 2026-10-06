@@ -186,13 +186,15 @@ const Tasks = {
       if (!t) return;
       t.done = !t.done; t.doneAt = t.done ? Date.now() : 0; nowDone = t.done;
     });
-    if (nowDone) celebrate();   // 完成一件事：水面荡开一圈涟漪
+    if (nowDone) celebrate();   // 完成一件事：骑士开心地蹦一下
   },
 };
 
-/* 手绘勾选框：勾是一笔 SVG，勾上时「画」出来 */
+/* 像素勾选框：勾是 7×7 的像素图（每列一个 1×2 的小方块），勾上时弹出来 */
+const CHECK_SVG = '<svg viewBox="0 0 7 7" shape-rendering="crispEdges">' +
+  [3, 4, 5, 4, 3, 2, 1].map((y, x) => `<rect x="${x}" y="${y}" width="1" height="2"/>`).join('') + '</svg>';
 function checkBox(on, onclick, label){
   const b = h('button.check' + (on ? '.on' : ''), { onclick: e => { e.stopPropagation(); onclick(); }, 'aria-pressed': on ? 'true' : 'false', 'aria-label': label || '完成' });
-  b.innerHTML = '<svg viewBox="0 0 20 20"><path d="M4.5 10.5 L8.5 14.5 L15.5 5"/></svg>';
+  b.innerHTML = CHECK_SVG;
   return b;
 }
