@@ -1,27 +1,28 @@
 "use strict";
 /* ============================================================
-   room.js：横版 2D 地图（空洞骑士那种纯侧面）—— 一栋两层的小房子，镜头锁定骑士
+   room.js：横版 2D 地图（空洞骑士那种纯侧面）—— 一栋两层的小屋，镜头锁定 rabbit
    ------------------------------------------------------------
-   A / D 左右走；空格跳（按得越久跳得越高），空中再按一次 = 二段跳；站在家具上按 S 跳下来；
+   rabbit 坐在一把悬浮的金椅子上（像诸葛亮的四轮车，但是飘着），椅子带着他飘来飘去：
+   A / D 左右飘；空格跳（按得越久跳得越高），空中再按一次 = 二段跳；站在家具上按 S 下来；
    E 互动（接口留好了，目前没有任何互动）；W 先空着（以后进门 / 上楼梯）
-   一开始骑士坐在他那把木椅上（原画的姿势），一动就站起来
-   动画状态：SIT / IDLE / MOVE / JUMP / FALL / LAND（帧在 sprites.js），落地扬起灰尘
+   动画（sprites.js 的 RABBIT）：平时 idle_rabbit；番茄钟专注时 focus_rabbit_one（喝茶）
+   rabbit 左右两边长得不一样（一边衣服、一边机械），不能镜像，所以暂时一直朝右
    家具的顶面都是「单向平台」：从下面能穿上去，从上面落下能站住（阁楼的木地板也是）
-   镜头：平滑跟随骑士、朝他走的方向多看一点、到地图边缘停住
+   镜头：平滑跟随 rabbit、朝他飘的方向多看一点、到地图边缘停住
    视差：窗外的景色移动得慢（远），前景的柱子 / 植物移动得快（近）→ 2.5D 的深度
    像素风：房子画在低分辨率画布上（1 像素 = 2 世界单位，house.js），整数倍放大；
           人物和前景直接画在屏幕上，位置对齐到屏幕像素 → 镜头移动时也是平滑的
    ------------------------------------------------------------
    地图（世界坐标）3600 × 1000，约 4 屏宽、2 屏高；地板 y = 940，阁楼地板 y = 560
    像素坐标就是世界坐标 ÷ 2：1800 × 500，镜头 448 × 252
-   一楼从左到右：门厅 → 书房（两个高书架，挑高到屋顶）→ 茶室（窗、木椅、茶几）→ 工作间（书桌、电脑）→ 大窗
-   二楼阁楼（x 2100–3560）：床、圆窗、纸箱；从茶室旁边的一排置物板跳上去
+   一楼从左到右：门厅 → 书房（两个高博古架，挑高到屋顶）→ 茶室（月洞窗、番茄钟挂轴、茶桌）→ 工作间（书案、全息屏）→ 格子窗
+   二楼阁楼（x 2100–3560）：床、圆窗、樟木箱；从茶室旁边的一排置物板跳上去
    ============================================================ */
 
 const MAP_W = 3600, MAP_H = 1000, FLOOR_Y = 940, MEZZ_Y = 560, MEZZ_X0 = 2100;
 const WALL_L = 40, WALL_R = 3560, CEIL_Y = 20;
 const VIEW_W = 896, VIEW_H = 504;      // 镜头看到的范围（世界单位，16:9）
-const KH = 95, KHW = 15;               // 骑士的高 / 半宽（碰撞用；像素图约 26 × 52 像素）
+const KH = 120, KHW = 30;              // rabbit 连椅子的高 / 半宽（碰撞用；像素图约 38 × 55 像素，再浮空几像素）
 /* 手感：参照空洞骑士 —— 起步快、空中可以转向、下落比上升快、松开空格就不再往上 */
 const RUN = 170, GRAV = 1500, FALL_MUL = 1.35, JUMP_V = 562, CUT_V = 210, MAX_FALL = 720;
 const AIR_JUMP_V = 520, AIR_JUMPS = 1;  // 二段跳：比第一跳略低；落地后恢复次数
@@ -40,8 +41,6 @@ plat('书架', 976, 1104, 650);
 plat('小凳', 860, 910, 900);
 for (const [x0, x1, y] of [[790, 860, 820], [870, 950, 740], [1120, 1200, 570], [1220, 1300, 480], [1300, 1380, 400]]) plat('置物板', x0, x1, y);
 plat('窗台', 1508, 1732, 840);
-const CHAIR_SEAT = plat('木椅', 1802, 1848, 916);
-const PERCH = [1806, 824];             // 骑士坐着时，兔耳小鸟停在椅背顶上
 plat('茶几', 1920, 2020, 910);
 for (const [x0, x1, y] of [[2120, 2200, 860], [2230, 2310, 780], [2120, 2200, 700], [2230, 2310, 620]]) plat('置物板', x0, x1, y);
 plat('转椅', 2400, 2452, 904);
@@ -54,21 +53,17 @@ plat('床', 3150, 3360, 520);
 
 const Room = {
   t: 0,
-  x: 1840, y: FLOOR_Y, vx: 0, vy: 0,
+  x: 1860, y: FLOOR_Y, vx: 0, vy: 0,  // 一开始飘在茶室的地毯上
   facing: 1,
-  sitting: true,                    // 一开始坐在木椅上
   grounded: true, ground: null,     // 站在哪：null = 地板，否则是平台
   coyote: 0, jumpBuf: 0, jumpHeld: false, airJumps: AIR_JUMPS,
   groundY: FLOOR_Y,                 // 最近一次站稳的高度（镜头按它定高，小跳时不上下晃）
   drop: null, dropUntil: 0,
-  landT: 0,                         // 刚落地：蹲一下
-  phase: 0,
   keys: new Set(),
-  blink: { at: 1.6, until: 0 },
   cheer: -1, cheered: false,
   cam: { x: 0, y: 0 }, lookAhead: 0, camReady: false,
   bunny: { x: 1800, y: 860, facing: 1, jump: -1 },
-  hearts: [], puffs: [], feathers: [], puffAcc: 0,
+  hearts: [], puffs: [], feathers: [],
   s: 1, k: 2, kd: 2, ox: 0, oy: 0,
 
   /* ---------- 布局：镜头画面居中在舞台可用区域，最大 1 倍；
@@ -100,36 +95,29 @@ const Room = {
   interact(){},
   /* S：从平台上跳下来（地板上按没反应） */
   dropDown(){
-    if (this.sitting || !this.grounded || !this.ground) return;
+    if (!this.grounded || !this.ground) return;
     this.drop = this.ground; this.dropUntil = this.t + 0.3;
     this.grounded = false; this.ground = null; this.y += 2; this.vy = 80;
-  },
-  /* 从椅子上站起来：轻轻一跳落到地上 */
-  standUp(dir){
-    this.sitting = false;
-    this.grounded = false; this.ground = null; this.airJumps = AIR_JUMPS;
-    this.vy = -230; this.vx = (dir || 1) * 70;
-    this.drop = CHAIR_SEAT; this.dropUntil = this.t + 0.4;
   },
 
   hit(px, py){
     const [x, y] = this.toWorld(px, py);
     const b = this.bunny;
     if (Math.hypot(x - b.x, y - b.y) < 18) return 'bunny';
-    if (Math.abs(x - this.x) < 30 && y < this.y + 4 && y > this.y - KH) return 'knight';
+    if (Math.abs(x - this.x) < 40 && y < this.y + 4 && y > this.y - KH) return 'rabbit';
     return null;
   },
   click(px, py){
     const who = this.hit(px, py);
-    if (who === 'knight') this.doCheer();
+    if (who === 'rabbit') this.doCheer();
     else if (who === 'bunny'){ this.bunny.jump = 0; this._burst(this.bunny.x, this.bunny.y - 14, 2); chirp(); }
     return !!who;
   },
-  /* 开心：眯眼笑 ^ ^、站着的话原地蹦一下、冒爱心 */
+  /* 开心：椅子往上一蹦、冒爱心（以后换成画师画的 done_rabbit） */
   doCheer(){
     if (this.cheer >= 0 && this.cheer < 0.5) return;
     this.cheer = 0; this.cheered = false;
-    if (this.grounded && !this.sitting){ this.vy = -300; this.grounded = false; this.ground = null; }
+    if (this.grounded){ this.vy = -300; this.grounded = false; this.ground = null; }
   },
   _burst(x, y, n){
     for (let i = 0; i < n; i++) this.hearts.push({ x: x + rnd(-6, 6), y: y + rnd(-4, 4), vx: rnd(-14, 14), vy: rnd(-48, -30),
@@ -152,33 +140,22 @@ const Room = {
     const t = (this.t += dt);
     const dir = (this.keys.has('KeyD') ? 1 : 0) - (this.keys.has('KeyA') ? 1 : 0);
     this.jumpBuf = Math.max(0, this.jumpBuf - dt);
-    if (this.sitting){
-      // 坐着：一按方向键或空格就站起来
-      if (dir || this.jumpBuf > 0){ this.jumpBuf = 0; if (dir) this.facing = dir; this.standUp(dir); }
-    }
-    if (!this.sitting) this._physics(dt, dir);
-    this.landT = Math.max(0, this.landT - dt);
-    // 走路节奏 / 小灰尘
-    const walking = !this.sitting && this.grounded && Math.abs(this.vx) > 20;
+    this._physics(dt, dir);
+    // 椅子是飘着的，走起来不扬灰
+    const walking = this.grounded && Math.abs(this.vx) > 20;
     this.walking = walking;
-    if (walking){
-      this.phase += dt * 11 * Math.abs(this.vx) / RUN;
-      if ((this.puffAcc += dt) > 0.22){ this.puffAcc = 0; this._dust(this.x - this.facing * 9, this.y, 1, 2); }
-    } else this.phase = 0;
-    // 眨眼
-    if (t >= this.blink.at){ this.blink.until = t + 0.13; this.blink.at = t + (Math.random() < 0.2 ? 0.28 : rnd(2.5, 5.5)); }
     // 开心：到 0.3 时「叮」+ 冒爱心
     if (this.cheer >= 0){
       this.cheer += dt / 1.3;
       if (!this.cheered && this.cheer >= 0.3){
         this.cheered = true; clink();
-        this._burst(this.x + this.facing * 8, this.y - 100, 5);
+        this._burst(this.x + 6, this.y - 128, 5);
       }
       if (this.cheer > 1) this.cheer = -1;
     }
-    // 兔耳小鸟：在骑士身后上方飞着跟随；骑士坐着时停在椅背顶上
+    // 兔耳小鸟：在 rabbit 身后上方飞着跟随
     const b = this.bunny;
-    const [tx, ty] = this.sitting ? PERCH : [this.x - this.facing * 48, this.y - 96];
+    const [tx, ty] = [this.x - this.facing * 58, this.y - 118];
     const k = Math.min(1, dt * 3.5);
     b.x += (tx - b.x) * k; b.y += (ty - b.y) * k;
     if (Math.abs(tx - b.x) > 3) b.facing = tx > b.x ? 1 : -1; else b.facing = this.facing;
@@ -246,9 +223,7 @@ const Room = {
     this.y = landY; this.vy = 0; this.grounded = true; this.ground = land === 'floor' ? null : land;
     this.airJumps = AIR_JUMPS; this.groundY = landY;
     if (impact > 260){
-      const k = Math.min(1, impact / MAX_FALL);
-      this.landT = 0.06 + 0.08 * k;
-      this._dust(this.x, this.y, 3, 10 * k + 4);
+      this._dust(this.x, this.y, 3, 10 * Math.min(1, impact / MAX_FALL) + 4);
     }
   },
 
@@ -258,7 +233,7 @@ const Room = {
     const tx = clamp(this.x + this.lookAhead - VIEW_W / 2, 0, MAP_W - VIEW_W);
     // 竖直：按「最近站稳的高度」定镜头 → 原地小跳 / 二段跳时镜头不上下晃；
     // 人快跑出画面上沿 / 下沿（比如从高处往下掉）时才直接跟着人走
-    let refY = this.sitting ? this.y : this.groundY;
+    let refY = this.groundY;
     const sy = this.y - this.cam.y;
     if (!this.grounded && (sy < VIEW_H * 0.3 || sy > VIEW_H * 0.86)) refY = this.y;
     if (!this.grounded && this.y > this.groundY + 40) refY = this.y;   // 掉到比原来低的地方
@@ -295,8 +270,7 @@ const Room = {
     this._drawPuffs(q);
     this._drawFeathers(q);
     this._drawBunny(q);
-    this._drawKnight(q);
-    if (this.sitting) ctx.drawImage(CHAIR_FRONT.c, CHAIR_FRONT.x, CHAIR_FRONT.y);   // 扶手和前腿在骑士前面
+    this._drawRabbit(q);
     this._drawHearts(q);
     ctx.restore();
     // 4) 前景：比中景移动得多
@@ -305,30 +279,27 @@ const Room = {
     drawForeground(ctx, t, camX, camY, q);
     ctx.restore();
   },
-  /* 现在是哪个动作（帧在 sprites.js 的 KF 里） */
-  _pose(){
-    if (this.sitting) return 'sit';
-    if (!this.grounded) return this.vy < 0 ? 'jump' : 'fall';
-    if (this.landT > 0) return 'land';
-    if (this.walking) return 'walk' + (Math.floor(this.phase / (Math.PI / 4)) % 8);   // 8 帧，满速约 14 帧/秒
-    return (this.t % 1.6) < 0.8 ? 'idle' : 'breathe';
+  /* 现在播哪段动画：番茄钟专注进行中 → 喝茶；其余时候（包括飘着、跳着）→ idle */
+  _anim(){
+    const focus = typeof Pomo !== 'undefined' && Pomo.t.running && Pomo.t.mode === 'focus';
+    return RABBIT.anims[focus ? 'focus' : 'idle'];
   },
-  _drawKnight(q){
-    const pose = this._pose(), eye = this.cheer >= 0 ? 'happy' : (this.blink.until > this.t ? 'blink' : 'open');
-    const f = KF[eye][pose], flip = this.facing < 0;
-    const x = q(this.x / PX), y = q(this.y / PX);
-    if (this.grounded && !this.sitting){   // 脚下的影子
-      ctx.fillStyle = 'rgba(70,45,35,0.22)';
-      ctx.fillRect(x - 9, y, 18, 1); ctx.fillRect(x - 6, y + 1, 12, 1);
-    }
-    ctx.drawImage(flip ? f.l : f.r, x - (flip ? KW - K_AX : K_AX), y - f.h + (K_DY[pose] || 0));
+  _drawRabbit(q){
+    const x = q(this.x / PX), y = q(this.y / PX), a = this._anim();
+    // 椅子底下的一圈淡金光（悬浮）
+    const glow = 0.28 + Math.sin(this.t * 3) * 0.06 + (this.grounded ? 0 : -0.12);
+    ctx.fillStyle = `rgba(255,200,110,${glow})`;
+    ctx.fillRect(x - 12, y - 1, 24, 1); ctx.fillRect(x - 7, y, 14, 1);
+    ctx.fillStyle = `rgba(255,230,160,${glow + 0.15})`; ctx.fillRect(x - 4, y - 1, 8, 1);
+    if (!a.img.complete || !a.img.naturalWidth) return;
+    const i = Math.floor(this.t * a.fps) % a.n;
+    ctx.drawImage(a.img, i * RABBIT.W, 0, RABBIT.W, RABBIT.H, x - RABBIT.AX, y - RABBIT.HOVER - RABBIT.BOTTOM - 1, RABBIT.W, RABBIT.H);
   },
   _drawBunny(q){
     const b = this.bunny, t = this.t;
-    const perched = this.sitting && Math.hypot(b.x - PERCH[0], b.y - PERCH[1]) < 4;
     const hop = b.jump >= 0 ? Math.round(Math.sin(b.jump * Math.PI) * 7) : 0;
-    const bob = perched ? 0 : Math.round(Math.sin(t * 3) * 2);
-    const fr = BUNNY[perched ? 0 : Math.floor(t * 9) % 2];
+    const bob = Math.round(Math.sin(t * 3) * 2);
+    const fr = BUNNY[Math.floor(t * 9) % 2];
     ctx.drawImage(b.facing > 0 ? fr.r : fr.l, q(b.x / PX) - 7, q(b.y / PX) - 6 - hop + bob);
   },
   _drawPuffs(q){

@@ -20,10 +20,10 @@ function frame(now){
   requestAnimationFrame(frame);
 }
 
-/* 完成一件事（任务 / 打卡 / 番茄）：骑士开心地蹦一下、冒爱心 */
+/* 完成一件事（任务 / 打卡 / 番茄）：rabbit 开心地蹦一下、冒爱心 */
 function celebrate(){ Room.doCheer(); }
 
-/* ---------- 交互：点骑士 / 点小鸟 / 色板 / 静音 ---------- */
+/* ---------- 交互：点 rabbit / 点小鸟 / 色板 / 静音 ---------- */
 cv.addEventListener('pointerdown', e => {
   initAudio();
   const sw = hitSwatch(e.clientX, e.clientY);
@@ -58,7 +58,7 @@ window.addEventListener('keyup', e => {
   Room.keyUp(e.code);
   if (e.code === 'Space' && !typing(e)) e.preventDefault();   // 别让空格去「点」面板里刚点过的按钮
 });
-// 切走窗口 / 开始在输入框里打字：松开所有方向键，免得骑士一直走
+// 切走窗口 / 开始在输入框里打字：松开所有方向键，免得 rabbit 一直飘
 window.addEventListener('blur', () => Room.clearKeys());
 document.addEventListener('focusin', e => { if (typing(e)) Room.clearKeys(); });
 

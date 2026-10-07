@@ -17,7 +17,7 @@ function pxCanvas(w, h){
 
 /* ---------- 往 PG（当前像素画布）上画：坐标都是整数像素 ---------- */
 let PG = null;
-const OUTL = '#3d2c2a';             // 家具的勾边色（比骑士的黑线柔和一点 → 人物更跳出来）
+const OUTL = '#3d2c2a';             // 家具的勾边色（比角色的黑线柔和一点 → 人物更跳出来）
 function rect(x, y, w, h, c){ PG.fillStyle = c; PG.fillRect(x, y, w, h); }
 function dot(x, y, c){ PG.fillStyle = c; PG.fillRect(x, y, 1, 1); }
 /* 勾边方块 */

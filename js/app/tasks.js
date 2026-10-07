@@ -186,7 +186,7 @@ const Tasks = {
       if (!t) return;
       t.done = !t.done; t.doneAt = t.done ? Date.now() : 0; nowDone = t.done;
     });
-    if (nowDone) celebrate();   // 完成一件事：骑士开心地蹦一下
+    if (nowDone) celebrate();   // 完成一件事：rabbit 开心地蹦一下
   },
 };
 
