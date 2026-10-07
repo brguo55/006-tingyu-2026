@@ -76,8 +76,8 @@ function paintHouse(g){
   // 竖梁（阁楼那边只到阁楼地板）
   for (const x of [280, 700, 1050, 1450]) post(x - 3, A_CE, (x >= A_MX ? A_MZ : A_FL) - A_CE);
   // 窗：玻璃是透明的
-  windowHole(760, 320, 100, 100);
-  windowHole(1525, 340, 100, 90);
+  windowHole(...WINDOWS[0]);
+  windowHole(...WINDOWS[1]);
   roundWindow(1350, 190, 26);
   // 地板
   rect(0, A_FL, AW, AH - A_FL, HC.fl);
@@ -114,6 +114,8 @@ function bricks(x, y, w, h){
     for (let i = (r % 2) * 5 + 2; i < w; i += 10) rect(x + i, y + j + 1, 1, 5, HC.brickDk);
   }
 }
+/* 窗户的玻璃（x, y, 宽, 高）：远景只在这里透出来。第三个是圆窗（中心 1350,190，半径 26）的外接方框 */
+const WINDOWS = [[760, 320, 100, 100], [1525, 340, 100, 90], [1324, 164, 53, 53]];
 function windowHole(x, y, w, h){
   bevel(x - 5, y - 5, w + 10, h + 10, HC.wm, HC.wl, HC.wd);
   rect(x - 1, y - 1, w + 2, h + 2, OUTL);
@@ -502,6 +504,8 @@ function drawHouseLayer(g, ix, iy, w, h){
   }
 }
 function drawFar(g, t, ix, iy, w, h){
+  // 镜头里一个窗户都没有：远景和雨丝都会被房子整个挡住，干脆不画
+  if (!WINDOWS.some(([x, y, ww, wh]) => x < ix + w && x + ww > ix && y < iy + h && y + wh > iy)) return;
   const fx = Math.floor(ix * FAR_PAR), fy = Math.floor(iy * FAR_PAR * 0.6);
   g.drawImage(farCv, fx, fy, w, h, 0, 0, w, h);
   g.fillStyle = 'rgba(226,236,244,0.75)';
