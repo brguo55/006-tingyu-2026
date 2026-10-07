@@ -61,7 +61,7 @@ const Room = {
   drop: null, dropUntil: 0,
   keys: new Set(),
   cheer: -1, cheered: false,
-  cam: { x: 0, y: 0 }, lookAhead: 0, camReady: false,
+  cam: { x: 0, y: 0 }, lookAhead: 0, camReady: false, settled: false,
   bunny: { x: 1800, y: 860, facing: 1, jump: -1 },
   hearts: [], puffs: [], feathers: [],
   s: 1, k: 2, kd: 2, ox: 0, oy: 0,
@@ -113,6 +113,11 @@ const Room = {
     else if (who === 'bunny'){ this.bunny.jump = 0; this._burst(this.bunny.x, this.bunny.y - 14, 2); chirp(); }
     return !!who;
   },
+  /* 画面「安静」：没在操作、rabbit 停着、镜头和小鸟都到位、没有粒子 → 主循环可以降帧省电 */
+  quiet(){
+    return !this.keys.size && this.jumpBuf <= 0 && this.grounded && Math.abs(this.vx) < 1 && this.cheer < 0
+      && !this.hearts.length && !this.puffs.length && !this.feathers.length && this.settled;
+  },
   /* 开心：椅子往上一蹦、冒爱心（以后换成画师画的 done_rabbit） */
   doCheer(){
     if (this.cheer >= 0 && this.cheer < 0.5) return;
@@ -158,6 +163,7 @@ const Room = {
     const [tx, ty] = [this.x - this.facing * 58, this.y - 118];
     const k = Math.min(1, dt * 3.5);
     b.x += (tx - b.x) * k; b.y += (ty - b.y) * k;
+    const birdSettled = Math.abs(tx - b.x) < 1 && Math.abs(ty - b.y) < 1;
     if (Math.abs(tx - b.x) > 3) b.facing = tx > b.x ? 1 : -1; else b.facing = this.facing;
     if (b.jump >= 0){ b.jump += dt / 0.5; if (b.jump > 1) b.jump = -1; }
     // 粒子
@@ -177,6 +183,7 @@ const Room = {
       if (f.t > f.life) this.feathers.splice(i, 1);
     }
     this._camera(dt, walking);
+    this.settled = this.settled && birdSettled;
   },
 
   _physics(dt, dir){
@@ -229,7 +236,8 @@ const Room = {
 
   /* 镜头：平滑跟随，朝前多看一点；人站在画面偏下的位置；到地图边缘停住 */
   _camera(dt, walking){
-    this.lookAhead += (this.facing * (walking ? 90 : 40) - this.lookAhead) * Math.min(1, dt * 1.8);
+    const la = this.facing * (walking ? 90 : 40);
+    this.lookAhead += (la - this.lookAhead) * Math.min(1, dt * 1.8);
     const tx = clamp(this.x + this.lookAhead - VIEW_W / 2, 0, MAP_W - VIEW_W);
     // 竖直：按「最近站稳的高度」定镜头 → 原地小跳 / 二段跳时镜头不上下晃；
     // 人快跑出画面上沿 / 下沿（比如从高处往下掉）时才直接跟着人走
@@ -241,6 +249,7 @@ const Room = {
     if (!this.camReady){ this.cam.x = tx; this.cam.y = ty; this.camReady = true; return; }
     this.cam.x += (tx - this.cam.x) * Math.min(1, dt * 5);
     this.cam.y += (ty - this.cam.y) * Math.min(1, dt * (this.vy > 300 ? 7 : 3.5));
+    this.settled = Math.abs(tx - this.cam.x) < 0.5 && Math.abs(ty - this.cam.y) < 0.5 && Math.abs(la - this.lookAhead) < 1;
   },
 
   draw(){

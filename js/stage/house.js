@@ -34,7 +34,7 @@ const HC = {
   red: '#c0392b', redLt: '#e06a4f',
   lantern: '#ff7a45', lanternLt: '#ffb070', lanternDk: '#c8452f',
   clay: '#a85a3a', clayLt: '#c97a52', straw: '#d9b36a', strawDk: '#a8833f',
-  white: '#fbf6ea', cream: '#f7f1e3', celadon: '#a9cdb8',
+  white: '#fbf6ea', celadon: '#a9cdb8',
 };
 const BOOKC = [['#3d5c9e', '#2c4475'], ['#a8322d', '#7a2420'], ['#d9b36a', '#a8833f'], ['#476c3c', '#33502c'], ['#e2c89a', '#c4a874'], ['#5a3a6e', '#422a52']];
 
