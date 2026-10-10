@@ -63,7 +63,8 @@ const Room = {
   cheer: -1, cheered: false,
   cam: { x: 0, y: 0 }, lookAhead: 0, camReady: false, settled: false,
   bunny: { x: 1800, y: 860, facing: 1, jump: -1 },
-  hearts: [], puffs: [], feathers: [],
+  hearts: [], puffs: [],
+  act: null,                        // 正在播的一次性动作：{ kind: 'takeoff' | 'boost' | 'land', t }
   s: 1, k: 2, kd: 2, ox: 0, oy: 0,
 
   /* ---------- 布局：镜头画面居中在舞台可用区域，最大 1 倍；
@@ -116,7 +117,7 @@ const Room = {
   /* 画面「安静」：没在操作、rabbit 停着、镜头和小鸟都到位、没有粒子 → 主循环可以降帧省电 */
   quiet(){
     return !this.keys.size && this.jumpBuf <= 0 && this.grounded && Math.abs(this.vx) < 1 && this.cheer < 0
-      && !this.hearts.length && !this.puffs.length && !this.feathers.length && this.settled;
+      && !this.hearts.length && !this.puffs.length && !this.act && this.settled;
   },
   /* 开心：椅子往上一蹦、冒爱心（以后换成画师画的 done_rabbit） */
   doCheer(){
@@ -127,14 +128,6 @@ const Room = {
   _burst(x, y, n){
     for (let i = 0; i < n; i++) this.hearts.push({ x: x + rnd(-6, 6), y: y + rnd(-4, 4), vx: rnd(-14, 14), vy: rnd(-48, -30),
       t: 0, life: rnd(1.2, 1.8), size: rnd(5, 8), ph: rnd(0, TAU) });
-  },
-  _featherBurst(){
-    for (let i = 0; i < 8; i++){
-      const a = Math.PI * (0.15 + 0.7 * i / 7);   // 往下半圈散开
-      this.feathers.push({ x: this.x, y: this.y - 6, vx: Math.cos(a) * rnd(60, 130) * (i % 2 ? 1 : -1), vy: Math.sin(a) * rnd(20, 70),
-        rot: rnd(0, TAU), vr: rnd(-6, 6), t: 0, life: rnd(0.45, 0.7), ph: rnd(0, TAU), pink: i % 3 === 0 });
-    }
-    this.puffs.push({ x: this.x, y: this.y, vx: 0, t: 0, big: true, ring: true });
   },
   _dust(x, y, n, spread){
     for (let i = 0; i < n; i++) this.puffs.push({ x: x + rnd(-spread, spread), y, vx: rnd(-1, 1) * spread * 2, t: 0, big: n > 1 });
@@ -176,11 +169,11 @@ const Room = {
       const p = this.puffs[i]; p.t += dt; p.x += p.vx * dt;
       if (p.t > 0.5) this.puffs.splice(i, 1);
     }
-    for (let i = this.feathers.length - 1; i >= 0; i--){
-      const f = this.feathers[i]; f.t += dt;
-      f.vy += 260 * dt; f.vx *= Math.exp(-dt * 3);
-      f.x += (f.vx + Math.sin(f.t * 9 + f.ph) * 14) * dt; f.y += f.vy * dt; f.rot += f.vr * dt;
-      if (f.t > f.life) this.feathers.splice(i, 1);
+    // 一次性动作播完就清掉
+    if (this.act){
+      this.act.t += dt;
+      const len = { takeoff: RABBIT.TAKEOFF, boost: RABBIT.BOOST, land: RABBIT.LAND }[this.act.kind].length * 0.1;
+      if (this.act.t > len + 0.05) this.act = null;
     }
     this._camera(dt, walking);
     this.settled = this.settled && birdSettled;
@@ -201,12 +194,12 @@ const Room = {
     if (!this.grounded) this.coyote = Math.max(0, this.coyote - dt);
     if (this.jumpBuf > 0 && (this.grounded || this.coyote > 0)){
       this.vy = -JUMP_V; this.grounded = false; this.ground = null; this.coyote = 0; this.jumpBuf = 0;
-      this._dust(this.x, this.y, 1, 4);
+      this.act = { kind: 'takeoff', t: 0 };
     } else if (this.jumpBuf > 0 && !this.grounded && this.airJumps > 0){
-      // 二段跳：空中再蹬一下，脚下散开一圈小羽毛
+      // 二段跳：空中再推一下
       this.airJumps--; this.jumpBuf = 0;
       this.vy = -AIR_JUMP_V;
-      this._featherBurst();
+      this.act = { kind: 'boost', t: 0 };   // 二段跳：椅子底下喷火（老师画的）
       flap();
     }
     if (!this.jumpHeld && this.vy < -CUT_V) this.vy = -CUT_V;   // 松开空格：不再往上
@@ -229,6 +222,7 @@ const Room = {
     const impact = this.vy;
     this.y = landY; this.vy = 0; this.grounded = true; this.ground = land === 'floor' ? null : land;
     this.airJumps = AIR_JUMPS; this.groundY = landY;
+    this.act = { kind: 'land', t: 0 };
     if (impact > 260){
       this._dust(this.x, this.y, 3, 10 * Math.min(1, impact / MAX_FALL) + 4);
     }
@@ -277,7 +271,6 @@ const Room = {
     ctx.translate(this.ox - camX * k, this.oy - camY * k);
     ctx.scale(k, k);
     this._drawPuffs(q);
-    this._drawFeathers(q);
     this._drawBunny(q);
     this._drawRabbit(q);
     this._drawHearts(q);
@@ -288,21 +281,39 @@ const Room = {
     drawForeground(ctx, t, camX, camY, q);
     ctx.restore();
   },
-  /* 现在播哪段动画：番茄钟专注进行中 → 喝茶；其余时候（包括飘着、跳着）→ idle */
-  _anim(){
+  /* 现在画哪一帧：{ anim, i（第几帧）, dy（往下挪几像素，抵消画里自带的升高）}
+     空中：起跳 / 二段跳先播一遍，之后停在「往上」或「往下掉」那一帧；落地：往下一沉再回来；
+     平时：番茄钟专注中 → 喝茶（只有朝右），否则待机（分左右） */
+  _frame(){
+    const R = RABBIT, A = R.anims, dir = this.facing < 0 ? 'left' : 'right', act = this.act;
+    const play = (frames, ms) => {   // 一次性动作播到第几帧；播完了返回 -1
+      let acc = 0;
+      for (const f of frames){ acc += ms[f] / 1000; if (act.t < acc) return f; }
+      return -1;
+    };
+    if (!this.grounded){
+      if (act && act.kind === 'boost'){ const f = play(R.BOOST, R.MS.sec); if (f >= 0) return { anim: A['sec_' + dir], i: f, dy: R.LIFT.sec[f] }; }
+      if (act && act.kind === 'takeoff'){ const f = play(R.TAKEOFF, R.MS.jump); if (f >= 0) return { anim: A['jump_' + dir], i: f, dy: R.LIFT.jump[f] }; }
+      const f = this.vy < 0 ? R.RISE : R.FALL;
+      return { anim: A['jump_' + dir], i: f, dy: R.LIFT.jump[f] };
+    }
+    if (act && act.kind === 'land'){ const f = play(R.LAND, R.MS.jump); if (f >= 0) return { anim: A['jump_' + dir], i: f, dy: 0 }; }
     const focus = typeof Pomo !== 'undefined' && Pomo.t.running && Pomo.t.mode === 'focus';
-    return RABBIT.anims[focus ? 'focus' : 'idle'];
+    if (focus) return { anim: A.focus_right, i: Math.floor(this.t * 10) % A.focus_right.n, dy: 0 };
+    const idle = A['idle_' + dir];
+    return { anim: idle, i: Math.floor(this.t * 10) % idle.n, dy: 0 };
   },
   _drawRabbit(q){
-    const x = q(this.x / PX), y = q(this.y / PX), a = this._anim();
+    const x = q(this.x / PX), y = q(this.y / PX), R = RABBIT, fr = this._frame();
     // 椅子底下的一圈淡金光（悬浮）
     const glow = 0.28 + Math.sin(this.t * 3) * 0.06 + (this.grounded ? 0 : -0.12);
     ctx.fillStyle = `rgba(255,200,110,${glow})`;
     ctx.fillRect(x - 12, y - 1, 24, 1); ctx.fillRect(x - 7, y, 14, 1);
     ctx.fillStyle = `rgba(255,230,160,${glow + 0.15})`; ctx.fillRect(x - 4, y - 1, 8, 1);
-    if (!a.img.complete || !a.img.naturalWidth) return;
-    const i = Math.floor(this.t * a.fps) % a.n;
-    ctx.drawImage(a.img, i * RABBIT.W, 0, RABBIT.W, RABBIT.H, x - RABBIT.AX, y - RABBIT.HOVER - RABBIT.BOTTOM - 1, RABBIT.W, RABBIT.H);
+    const img = fr.anim.img;
+    if (!img.complete || !img.naturalWidth) return;
+    const ax = fr.anim === R.anims.focus_right || this.facing >= 0 ? R.AX.right : R.AX.left;
+    ctx.drawImage(img, fr.i * R.W, 0, R.W, R.H, x - ax, y - R.HOVER - R.BASE - 1 + fr.dy, R.W, R.H);
   },
   _drawBunny(q){
     const b = this.bunny, t = this.t;
@@ -321,13 +332,6 @@ const Room = {
         const w = Math.round(r * Math.sqrt(1 - (dy / (r * 0.6 + 0.5)) ** 2));
         ctx.fillRect(x - w, y - 1 - Math.floor(f * 2) + dy, w * 2 + 1, 1);
       }
-    }
-  },
-  _drawFeathers(q){
-    for (const f of this.feathers){
-      if (f.t / f.life > 0.6 && Math.floor(f.t * 20) % 2) continue;   // 快消失时一闪一闪
-      const s = FEATHERS[((Math.round(f.rot / (Math.PI / 4)) % 4) + 4) % 4], c = f.pink ? s.p : s.w;
-      ctx.drawImage(c, q(f.x / PX) - (c.width >> 1), q(f.y / PX) - (c.height >> 1));
     }
   },
   _drawHearts(q){
