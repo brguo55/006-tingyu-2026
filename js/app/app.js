@@ -5,13 +5,15 @@
    ============================================================ */
 
 const TABS = [
-  { id: 'tasks',  name: '任务', mod: Tasks },
-  { id: 'matrix', name: '轻重', mod: Matrix },      // 四象限（艾森豪威尔矩阵）
-  { id: 'pomo',   name: '番茄', mod: Pomo },
-  { id: 'habits', name: '习惯', mod: Habits },
-  { id: 'count',  name: '倒数', mod: Countdown },   // 倒数日
-  { id: 'set',    name: '设置', mod: Settings },
+  { id: 'tasks',  name: '任务', mod: Tasks,     label: '任务' },
+  { id: 'matrix', name: '轻重', mod: Matrix,    label: '轻重（四象限）' },   // 艾森豪威尔矩阵
+  { id: 'pomo',   name: '番茄', mod: Pomo,      label: '番茄钟' },
+  { id: 'habits', name: '习惯', mod: Habits,    label: '习惯打卡' },
+  { id: 'count',  name: '倒数', mod: Countdown, label: '倒数日' },
+  { id: 'set',    name: '设置', mod: Settings },   // 设置永远显示（不然关掉就找不回来了）
 ];
+/* 这个功能要不要显示在面板里：设置页总是显示；其余看设置里的勾选 */
+const tabShown = id => id === 'set' || !(Store.data && Store.data.settings.hidden.includes(id));
 const PANEL_W = 380, PANEL_GAP = 16, NARROW = 760;
 
 /* 只是本机界面习惯（开没开面板、上次在哪个页签），不算数据，放 localStorage */
@@ -48,6 +50,7 @@ const App = {
   _dateLine(){ const d = new Date(); return `${d.getMonth() + 1}月${d.getDate()}日 · 周${WEEK[d.getDay()]}`; },
 
   showTab(id){
+    if (!tabShown(id)) id = TABS.find(t => tabShown(t.id)).id;
     this.tab = id; ui.tab = id; saveUi();
     for (const b of this.el.tabs.children) b.classList.toggle('on', b.dataset.tab === id);
     for (const [k, s] of Object.entries(this.el.sections)) s.hidden = k !== id;
@@ -55,6 +58,9 @@ const App = {
     this.render();
   },
   render(){
+    // 当前页被隐藏了 → 跳到第一个还显示着的页
+    if (!tabShown(this.tab)) return this.showTab(this.tab);
+    for (const b of this.el.tabs.children) b.hidden = !tabShown(b.dataset.tab);
     TABS.find(t => t.id === this.tab).mod.refresh();
     this.renderBanner();
   },

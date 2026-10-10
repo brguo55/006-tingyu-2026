@@ -1,6 +1,6 @@
 "use strict";
 /* ============================================================
-   app/settings.js：设置页 —— 备份（最重要）/ 小房间 / 声音 / 安装 / 关于
+   app/settings.js：设置页 —— 备份（最重要）/ 面板显示 / 小房间 / 声音 / 安装 / 关于
    ============================================================ */
 
 const Settings = {
@@ -54,6 +54,19 @@ const Settings = {
         h('li', null, '备份文件夹千万不要放在 GitHub 仓库的文件夹里——仓库是公开的。'),
         h('li', null, '清除浏览器的「Cookie 和网站数据」、卸载 App 时勾选「同时清除数据」，都会删掉本机数据；有备份就能找回。'),
         h('li', null, B.persisted ? '浏览器已答应：空间紧张时也不会自动清掉听雨的数据。' : '建议用 Chrome / Edge 并安装成 App，数据更稳；Safari 会清掉一段时间没打开的网站数据。'))));
+
+    /* ---------- 面板显示：每个功能可以选择要不要 ---------- */
+    const hidden = d.settings.hidden;
+    const toggle = id => Store.update(dd => {
+      const hs = dd.settings.hidden, i = hs.indexOf(id);
+      if (i >= 0) hs.splice(i, 1); else hs.push(id);
+    });
+    kids.push(h('section.set', null,
+      h('h3', null, '面板显示'),
+      h('p', null, '勾上的功能才会出现在右边的面板里。'),
+      h('div.feature-list', null, ...TABS.filter(t => t.label).map(t =>
+        h('label.switch', null, checkBox(!hidden.includes(t.id), () => toggle(t.id), t.label), ' ' + t.label))),
+      h('p.muted', null, '取消勾选只是不显示，里面的数据都还在，重新勾上就回来了。「设置」会一直显示。')));
 
     /* ---------- 小房子 ---------- */
     kids.push(h('section.set', null,

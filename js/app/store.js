@@ -61,7 +61,8 @@ function freshData(){
     checks: {},          // { 习惯id: { 'YYYY-MM-DD': 1 } }
     pomos: [],           // { id, start, end, minutes, taskId }
     countdowns: [],      // { id, name, date: 'YYYY-MM-DD', yearly, color, createdAt }
-    settings: { weather: 0, theme: 2, ambient: true, muted: false, focusMin: 25, shortMin: 5, longMin: 15, longEvery: 4 },
+    settings: { weather: 0, theme: 2, ambient: true, muted: false, focusMin: 25, shortMin: 5, longMin: 15, longEvery: 4,
+                hidden: [] },   // hidden：设置里取消勾选、不在面板里显示的功能（页签 id）
     meta: { createdAt: now, updatedAt: now },
   };
 }
@@ -71,6 +72,7 @@ function migrate(d){
   const base = freshData();
   const out = Object.assign({}, base, d);
   out.settings = Object.assign({}, base.settings, d.settings);
+  if (!Array.isArray(out.settings.hidden)) out.settings.hidden = [];
   out.meta = Object.assign({}, base.meta, d.meta);
   for (const k of ['lists', 'tasks', 'habits', 'pomos', 'countdowns']) if (!Array.isArray(out[k])) out[k] = [];
   if (!out.checks || typeof out.checks !== 'object') out.checks = {};
