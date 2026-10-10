@@ -57,6 +57,19 @@ function clink(){
   tone(base * 1.06, 0.035, 0.035, cup);
 }
 
+/* 门口的控制面板：像空调遥控器那样「滴」一声 */
+function beep(){
+  if (!AC || AC.state !== 'running') return;
+  const o = AC.createOscillator(), g = AC.createGain(), t0 = AC.currentTime;
+  o.frequency.value = 1760;
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(0.035, t0 + 0.005);
+  g.gain.setValueAtTime(0.035, t0 + 0.07);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.1);
+  o.connect(g); g.connect(master);
+  o.start(t0); o.stop(t0 + 0.12);
+}
+
 /* 点到小鸟：一声短短的「啾」 */
 function chirp(){
   if (!AC || AC.state !== 'running') return;

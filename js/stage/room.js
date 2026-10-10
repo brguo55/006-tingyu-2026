@@ -65,6 +65,7 @@ const Room = {
   bunny: { x: 1800, y: 860, facing: 1, jump: -1 },
   hearts: [], puffs: [],
   act: null,                        // 正在播的一次性动作：{ kind: 'takeoff' | 'boost' | 'land', t }
+  hover: null, nearPanel: false,    // 鼠标指着什么；rabbit 是不是在门口的控制面板旁边
   s: 1, k: 2, kd: 2, ox: 0, oy: 0,
 
   /* ---------- 布局：镜头画面居中在舞台可用区域，最大 1 倍；
@@ -92,8 +93,9 @@ const Room = {
   },
   keyUp(code){ this.keys.delete(code); if (code === 'Space') this.jumpHeld = false; },
   clearKeys(){ this.keys.clear(); this.jumpHeld = false; },
-  /* E：互动 —— 先留空，以后在这里判断「面前是什么家具」再决定做什么（比如坐回椅子、用电脑） */
-  interact(){},
+  /* E：互动 —— 看 rabbit 面前是什么。现在只有门口的控制面板：打开设置 */
+  interact(){ if (this.nearPanel) this._openSettings(); },
+  _openSettings(){ beep(); if (typeof openSettings === 'function') openSettings(); },
   /* S：从平台上跳下来（地板上按没反应） */
   dropDown(){
     if (!this.grounded || !this.ground) return;
@@ -103,14 +105,16 @@ const Room = {
 
   hit(px, py){
     const [x, y] = this.toWorld(px, py);
-    const b = this.bunny;
+    const b = this.bunny, [cx, cy, cw, ch] = CTRL;
+    if (x > cx * PX - 4 && x < (cx + cw) * PX + 4 && y > cy * PX - 4 && y < (cy + ch) * PX + 4) return 'panel';
     if (Math.hypot(x - b.x, y - b.y) < 18) return 'bunny';
     if (Math.abs(x - this.x) < 40 && y < this.y + 4 && y > this.y - KH) return 'rabbit';
     return null;
   },
   click(px, py){
     const who = this.hit(px, py);
-    if (who === 'rabbit') this.doCheer();
+    if (who === 'panel') this._openSettings();
+    else if (who === 'rabbit') this.doCheer();
     else if (who === 'bunny'){ this.bunny.jump = 0; this._burst(this.bunny.x, this.bunny.y - 14, 2); chirp(); }
     return !!who;
   },
@@ -139,6 +143,8 @@ const Room = {
     const dir = (this.keys.has('KeyD') ? 1 : 0) - (this.keys.has('KeyA') ? 1 : 0);
     this.jumpBuf = Math.max(0, this.jumpBuf - dt);
     this._physics(dt, dir);
+    const [cx, , cw] = CTRL;
+    this.nearPanel = this.grounded && this.y > FLOOR_Y - 60 && Math.abs(this.x - (cx + cw / 2) * PX) < 60;
     // 椅子是飘着的，走起来不扬灰
     const walking = this.grounded && Math.abs(this.vx) > 20;
     this.walking = walking;

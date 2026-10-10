@@ -268,7 +268,9 @@ function scroll(x, y, w, h){
   rect(x - 3, y + h, w + 6, 3, HC.wdk); dot(x - 4, y + h + 1, HC.gold); dot(x + w + 3, y + h + 1, HC.gold);
 }
 
-/* ---------- 门厅：格扇门、对联、油纸伞、衣帽架（斗笠 + 粉斗篷）、鞋凳 ---------- */
+/* 门口墙上的控制面板（像空调遥控器）：点它、或者飘到旁边按 E → 打开设置 */
+const CTRL = [150, 408, 15, 20];   // x, y, 宽, 高（像素）
+/* ---------- 门厅：格扇门、对联、油纸伞、衣帽架（斗笠 + 粉斗篷）、鞋凳、控制面板 ---------- */
 function drawEntrance(){
   bevel(46, 391, 53, 79, HC.lac, HC.lacL, HC.lacD);
   for (const lx of [51, 73]){
@@ -297,6 +299,12 @@ function drawEntrance(){
   bevel(165, 456, 51, 4, HC.wl, HC.wh, HC.wd);
   for (const x of [168, 209]) boxO(x, 460, 4, 10, HC.wd);
   art(BOOT, BOOT_PAL, 176, 465); art(BOOT, BOOT_PAL, 188, 465);
+  // 控制面板：铜框、玉色小屏幕（内容每帧画）、两个小按钮
+  const [cx, cy, cw, ch] = CTRL;
+  rect(cx + 1, cy + ch, cw, 1, 'rgba(60,40,30,0.25)');                     // 一点点投影
+  bevel(cx, cy, cw, ch, HC.goldDk, HC.gold, '#7a5222');
+  rect(cx + 2, cy + 2, cw - 4, 9, OUTL); rect(cx + 3, cy + 3, cw - 6, 7, HC.jadeDk);
+  for (const bx of [cx + 3, cx + 8]) { rect(bx, cy + 13, 4, 3, OUTL); rect(bx + 1, cy + 14, 2, 1, HC.wl); }
 }
 
 /* ---------- 书房：两个高高的博古架、绣墩、一路往上的置物板、星图手卷 ---------- */
@@ -638,6 +646,22 @@ function drawHouseLive(g, t, ix, iy){
     if (!running || (t % 1) < 0.5){ dot(X(px + 12), Y(py + 27), HC.red); }
     rect(X(px + 4), Y(py + 48), pw - 8, 2, HC.paperDk); rect(X(px + 4), Y(py + 48), Math.round((pw - 8) * frac), 2, HC.red);
     rect(X(px + pw - 9), Y(py + 52), 4, 4, HC.red);
+  }
+  // 门口的控制面板：屏幕上一个小齿轮在发光，指示灯一闪一闪；鼠标指着时整块亮起来；rabbit 在旁边时冒一个 E 键提示
+  {
+    const [cx, cy, cw, ch] = CTRL, x = X(cx), y = Y(cy), hot = typeof Room !== 'undefined' && (Room.hover === 'panel' || Room.nearPanel);
+    if (x > -30 && x < 470 && y > -30 && y < 270){
+      const gear = ['.#.#.', '#####', '##.##', '#####', '.#.#.'];
+      gear.forEach((r, j) => { for (let i = 0; i < 5; i++) if (r[i] === '#') dot(x + 5 + i, y + 4 + j, hot ? '#e8fff6' : HC.jadeLt); });
+      if (hot) rect(x + 3, y + 3, cw - 6, 7, 'rgba(166,227,200,0.25)');
+      dot(x + cw - 3, y + 14, (t % 1.6) < 1.2 ? '#8fe07e' : '#3f6a3a');
+      if (hot){ rect(x - 1, y - 1, cw + 2, 1, HC.goldLt); rect(x - 1, y + ch, cw + 2, 1, HC.goldLt); rect(x - 1, y, 1, ch, HC.goldLt); rect(x + cw, y, 1, ch, HC.goldLt); }
+      if (typeof Room !== 'undefined' && Room.nearPanel){
+        const ky = y - 13 + Math.round(Math.sin(t * 4)), kx = x + 3;
+        rect(kx + 1, ky, 7, 9, OUTL); rect(kx, ky + 1, 9, 7, OUTL); rect(kx + 1, ky + 1, 7, 7, HC.white); rect(kx + 1, ky + 7, 7, 1, HC.paperDk);
+        rect(kx + 3, ky + 2, 1, 5, OUTL); rect(kx + 3, ky + 2, 3, 1, OUTL); rect(kx + 3, ky + 4, 2, 1, OUTL); rect(kx + 3, ky + 6, 3, 1, OUTL);
+      }
+    }
   }
   // 全息屏里在下雨 + 闪烁的光标
   const sx = X(1257), sy = Y(397);

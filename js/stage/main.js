@@ -30,7 +30,7 @@ function frame(now){
 /* 完成一件事（任务 / 打卡 / 番茄）：rabbit 开心地蹦一下、冒爱心 */
 function celebrate(){ Room.doCheer(); }
 
-/* ---------- 交互：点 rabbit / 点小鸟 / 色板 / 静音 ---------- */
+/* ---------- 交互：点 rabbit / 点小鸟 / 点门口的控制面板 / 色板 / 静音 ---------- */
 cv.addEventListener('pointerdown', e => {
   initAudio(); wake();
   const sw = hitSwatch(e.clientX, e.clientY);
@@ -41,9 +41,12 @@ cv.addEventListener('pointerdown', e => {
 cv.addEventListener('pointermove', e => {
   wake();
   const h = hitSwatch(e.clientX, e.clientY), hm = hitMuteBtn(e.clientX, e.clientY), hc = Room.hit(e.clientX, e.clientY);
+  Room.hover = hc;
   if (h !== hoverIdx || hm !== muteHover){ hoverIdx = h; muteHover = hm; }
   cv.style.cursor = (h >= 0 || hm || hc) ? 'pointer' : '';
 });
+
+cv.addEventListener('pointerleave', () => { Room.hover = null; });
 
 /* ---------- 键盘 ---------- */
 /* 正在面板的输入框里打字时，不触发快捷键 */

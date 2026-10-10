@@ -105,6 +105,12 @@ const App = {
   },
 };
 
+/* 门口的控制面板（点它，或者 rabbit 在旁边按 E）：打开面板，跳到设置 */
+function openSettings(){
+  if (document.body.classList.contains('immersive')) App.immersive(false);
+  App.showTab('set');
+}
+
 /* 画布上换了颜色 / 静音（点色板、小喇叭，或按 M）→ 记下来 */
 function onSceneChange(){
   App.themeVars();
